@@ -9,7 +9,7 @@ public class HarborApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(HarborApplication.class, args);
-		System.out.println("Hello worldicls");
+		System.out.println("Hello world!");
 	}
 
 }
