@@ -1,6 +1,5 @@
-package com.waffles.harbor.repositories;
+package com.waffles.harbor.user;
 
-import com.waffles.harbor.entities.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

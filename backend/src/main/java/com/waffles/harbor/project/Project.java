@@ -1,9 +1,9 @@
-package com.waffles.harbor.entities;
+package com.waffles.harbor.project;
 
+import com.waffles.harbor.user.User;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
@@ -13,9 +13,17 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "projects")
 @Getter
 @Setter
+@Table(
+        name = "projects",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name="uk_user_project_name",
+                        columnNames = {"user_id", "project_name"}
+                )
+        }
+)
 public class Project {
 
     @Id
@@ -24,7 +32,7 @@ public class Project {
 
     @NotBlank(message = "Project name cannot be blank!")
     @Size(max = 100)
-    @Column(nullable = false)
+    @Column(nullable = false, name = "project_name", length = 100)
     private String projectName;
 
     @CreationTimestamp
