@@ -57,6 +57,7 @@ public class User implements UserDetails {
     private LocalDateTime updatedAt;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private Role role;
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
