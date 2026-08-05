@@ -9,6 +9,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/projects")
@@ -24,11 +25,11 @@ public class ProjectController {
                 .body(projectService.getAllProjects(user));
     }
 
-    @GetMapping("/{projectName}")
-    public ResponseEntity<ProjectResponse> getProjectByName(@AuthenticationPrincipal User user, @PathVariable String projectName){
+    @GetMapping("/{projectId}")
+    public ResponseEntity<ProjectResponse> getProjectByName(@AuthenticationPrincipal User user, @PathVariable UUID projectId){
 
         return ResponseEntity.status(HttpStatus.OK)
-                .body(projectService.getProjectByName(user,projectName));
+                .body(projectService.getProjectByProjectId(user,projectId));
     }
 
     @PostMapping

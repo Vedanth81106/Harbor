@@ -1,11 +1,11 @@
 package com.waffles.harbor.security;
 
+import com.waffles.harbor.user.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -18,9 +18,9 @@ public class JwtService {
     @Value("${jwt.secret-key}")
     private String securityKey;
 
-    public String generateToken(UserDetails userDetails){
+    public String generateToken(User user){
         return Jwts.builder()
-                .subject(userDetails.getUsername())
+                .subject(user.getUserId().toString())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 240))
                 .signWith(getSigningKey())
@@ -46,7 +46,7 @@ public class JwtService {
         return claimsResolver.apply(claims);
     }
 
-    public String extractUsername(String token){
+    public String extractSubject(String token){
         return extractClaim(token, Claims::getSubject);
     }
 
@@ -58,8 +58,9 @@ public class JwtService {
         return extractExpiration(token).before(new Date());
     }
 
-    public boolean isTokenValid(String token, UserDetails userDetails){
-        final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+    public boolean isTokenValid(String token, User user){
+        final String subject = extractSubject(token);
+        return subject.equals(user.getUserId().toString())
+                && !isTokenExpired(token);
     }
 }

@@ -3,21 +3,26 @@ package com.waffles.harbor.project;
 import com.waffles.harbor.user.User;
 import com.waffles.harbor.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class ProjectService {
 
-    private final UserRepository userRepository;
     private final ProjectRepository projectRepository;
 
     public ProjectResponse createProject(User user, ProjectRequest projectRequest){
 
-        if(projectRepository.findByUserAndProjectNameIgnoreCase(user, projectRequest.getProjectName()).isPresent())
-            throw new IllegalArgumentException("Project with the project name " + projectRequest.getProjectName() + " already exists!");
+        if(projectRepository.existsByUserAndProjectNameIgnoreCase(user, projectRequest.getProjectName()))
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Project with the project name " + projectRequest.getProjectName() + " already exists!"
+            );
 
         var project = Project.builder()
                 .user(user)
@@ -38,9 +43,9 @@ public class ProjectService {
                 .toList();
     }
 
-    public ProjectResponse getProjectByName(User user, String projectName){
+    public ProjectResponse getProjectByProjectId(User user, UUID projectId){
 
-        Project project = projectRepository.findByUserAndProjectNameIgnoreCase(user,projectName)
+        Project project = projectRepository.findByUserAndProjectId(user,projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project could not be found!"));
 
         return toResponse(project);
