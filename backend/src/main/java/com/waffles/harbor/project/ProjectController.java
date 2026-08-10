@@ -22,7 +22,7 @@ public class ProjectController {
     public ResponseEntity<List<ProjectResponse>> getAllProjectsByUser(@AuthenticationPrincipal User user){
 
         return ResponseEntity.status(HttpStatus.OK)
-                .body(projectService.getAllProjects(user));
+                .body(projectService.getAllProjectsByUser(user));
     }
 
     @GetMapping("/{projectId}")

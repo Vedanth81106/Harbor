@@ -1,7 +1,6 @@
 package com.waffles.harbor.project;
 
 import com.waffles.harbor.user.User;
-import com.waffles.harbor.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,7 +33,7 @@ public class ProjectService {
         return toResponse(savedProject);
     }
 
-    public List<ProjectResponse> getAllProjects(User user){
+    public List<ProjectResponse> getAllProjectsByUser(User user){
 
         List<Project> projects = projectRepository.findByUserOrderByCreatedAtDesc(user);
 

@@ -131,14 +131,15 @@ public class AuthServiceTest {
         verify(userRepository).save(captor.capture());
         User savedUser = captor.getValue();
 
-        verify(passwordEncoder).encode("pwd");
-        verify(jwtService).generateToken(savedUser);
-
-        assertNotNull(response);
         assertEquals("hashed",savedUser.getPasswordHash());
         assertEquals("happy",savedUser.getUsername());
         assertEquals("happy@gmail.com",savedUser.getEmail());
         assertEquals(Role.USER,savedUser.getRole());
+
+        verify(passwordEncoder).encode("pwd");
+        verify(jwtService).generateToken(savedUser);
+
+        assertNotNull(response);
         assertEquals("very-secure-jwt-token", response.getAccessToken());
         assertEquals("happy", response.getUsername());
         assertEquals("happy@gmail.com", response.getEmail());
@@ -210,5 +211,4 @@ public class AuthServiceTest {
         verify(userRepository, never()).findByUsernameOrEmail(any(), any());
         verify(jwtService, never()).generateToken(any());
     }
-
 }
