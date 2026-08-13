@@ -17,11 +17,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AuthController.class)
 @Import(SecurityConfig.class)
@@ -62,7 +60,7 @@ class AuthControllerTest {
                                         }
                                         """)
                 )
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("fake-jwt"))
                 .andExpect(jsonPath("$.username").value("happy"))
                 .andExpect(jsonPath("$.email").value("happy@gmail.com"));
@@ -160,7 +158,7 @@ class AuthControllerTest {
                         post("/auth/register")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
-                            {
+                                        {
                                             "username": "hi",
                                             "password": "password123",
                                             "email":"happy@gmail.com"

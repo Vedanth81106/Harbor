@@ -14,6 +14,6 @@ import lombok.NoArgsConstructor;
 public class ProjectRequest {
 
     @NotBlank(message = "Project name cannot be blank!")
-    @Size(max = 100)
+    @Size(min = 3,max = 100)
     private String projectName;
 }
