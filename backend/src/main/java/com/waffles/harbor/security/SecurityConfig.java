@@ -2,6 +2,7 @@ package com.waffles.harbor.security;
 
 import com.waffles.harbor.user.User;
 import com.waffles.harbor.user.UserRepository;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -51,6 +52,13 @@ public class SecurityConfig {
 
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(
+                                (request, response, authException) ->
+                                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED)
+                        )
+                )
 
                 .authenticationProvider(authenticationProvider)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
