@@ -1,6 +1,8 @@
 package com.waffles.harbor.project;
 
 import com.waffles.harbor.auth.Role;
+import com.waffles.harbor.exception.ProjectAlreadyExistsException;
+import com.waffles.harbor.exception.ProjectNotFoundException;
 import com.waffles.harbor.user.User;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -80,7 +82,7 @@ public class ProjectServiceTest {
                 .thenReturn(true);
 
         assertThrows(
-                ResponseStatusException.class,
+                ProjectAlreadyExistsException.class,
                 () -> projectService.createProject(user,projectRequest)
         );
 
@@ -154,7 +156,7 @@ public class ProjectServiceTest {
                 .thenReturn(Optional.empty());
 
         assertThrows(
-                IllegalArgumentException.class,
+                ProjectNotFoundException.class,
                 () -> projectService.getProjectByProjectId(user,projectId)
         );
 

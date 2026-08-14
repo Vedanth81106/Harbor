@@ -122,7 +122,7 @@ public class AuthIntegrationTest {
                                 }
                                 """)
                 )
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict());
     }
 
     @Test
@@ -151,7 +151,7 @@ public class AuthIntegrationTest {
                                 }
                                 """)
                 )
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict());
     }
 
     @Test

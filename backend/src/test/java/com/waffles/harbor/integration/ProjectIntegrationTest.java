@@ -212,7 +212,7 @@ public class ProjectIntegrationTest {
                                 "Bearer " + token2
                         )
         )
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isNotFound());
     }
 
     @Test

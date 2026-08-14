@@ -3,6 +3,8 @@ package com.waffles.harbor.auth;
 import com.waffles.harbor.auth.dto.AuthResponse;
 import com.waffles.harbor.auth.dto.LoginRequest;
 import com.waffles.harbor.auth.dto.RegisterRequest;
+import com.waffles.harbor.exception.EmailAlreadyExistsException;
+import com.waffles.harbor.exception.UsernameAlreadyExistsException;
 import com.waffles.harbor.security.JwtService;
 import com.waffles.harbor.user.User;
 import com.waffles.harbor.user.UserRepository;
@@ -75,7 +77,7 @@ public class AuthServiceTest {
                 .thenReturn(Optional.of(user));
 
         assertThrows(
-                IllegalArgumentException.class,
+                UsernameAlreadyExistsException.class,
                 () -> authService.register(registerRequest)
         );
 
@@ -98,7 +100,7 @@ public class AuthServiceTest {
                 .thenReturn(Optional.of(user));
 
         assertThrows(
-                IllegalArgumentException.class,
+                EmailAlreadyExistsException.class,
                 () -> authService.register(registerRequest)
         );
 
