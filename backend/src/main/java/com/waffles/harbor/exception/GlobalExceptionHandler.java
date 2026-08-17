@@ -25,13 +25,9 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidationException(
-            MethodArgumentNotValidException exception) {
+    public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException exception) {
 
-        return error(
-                HttpStatus.BAD_REQUEST,
-                "Request validation failed"
-        );
+        return error(HttpStatus.BAD_REQUEST,"Request validation failed");
     }
 
     @ExceptionHandler(BadCredentialsException.class)
@@ -62,11 +58,6 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException exception) {
-        ErrorResponse response = ErrorResponse.builder()
-                .status(HttpStatus.CONFLICT.value())
-                .message("The requested operation violates a database constraint").build();
-
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(response);
+        return error(HttpStatus.CONFLICT,"The requested operation violates a database constraint");
     }
 }
