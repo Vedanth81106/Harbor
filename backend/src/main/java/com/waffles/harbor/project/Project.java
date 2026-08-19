@@ -1,5 +1,6 @@
 package com.waffles.harbor.project;
 
+import com.waffles.harbor.deployment.Deployment;
 import com.waffles.harbor.user.User;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
@@ -9,6 +10,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -48,5 +51,8 @@ public class Project {
     @ManyToOne(fetch = FetchType.LAZY) // Many projects to one user
     @JoinColumn(name = "user_id", nullable = false)// Maps to user id field in User class
     private User user;
+
+    @OneToMany(mappedBy = "deployment", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Deployment> deployments = new ArrayList<>();
 
 }

@@ -2,6 +2,7 @@ package com.waffles.harbor.docker;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerResponse;
+import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.Ports;
@@ -16,7 +17,7 @@ public class DockerService {
         this.dockerClient = dockerClient;
     }
 
-    public String createNginxContainer() throws InterruptedException{
+    public String createNginxContainer() throws InterruptedException {
         dockerClient.pullImageCmd("nginx").withTag("latest").start().awaitCompletion();
 
         ExposedPort tcp80 = ExposedPort.tcp(80);
@@ -40,7 +41,7 @@ public class DockerService {
         return containerId;
     }
 
-    public String stopNginxContainer(String containerId) throws InterruptedException{
+    public String stopNginxContainer(String containerId){
 
         dockerClient.stopContainerCmd(containerId).exec();
         return containerId;
@@ -49,5 +50,12 @@ public class DockerService {
     public void removeNginxContainer(String containerId){
 
         dockerClient.removeContainerCmd(containerId).exec();
+    }
+
+    public InspectContainerResponse inspectContainerResponse(String containerId) {
+
+        // Contains container metadata, state, networking, ports,
+        // environment, mounts, restart policy, command, exit code, and health.
+        return dockerClient.inspectContainerCmd(containerId).exec();
     }
 }

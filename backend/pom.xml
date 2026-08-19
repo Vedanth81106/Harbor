@@ -142,7 +142,13 @@
 			<version>3.7.1</version>
 			<scope>compile</scope>
 		</dependency>
-
+		<!--jgit(git api) -->
+		<dependency>
+			<groupId>org.eclipse.jgit</groupId>
+			<artifactId>org.eclipse.jgit</artifactId>
+			<version>7.7.1.202607240634-r</version>
+			<scope>compile</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
