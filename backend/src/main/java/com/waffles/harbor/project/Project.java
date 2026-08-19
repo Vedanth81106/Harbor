@@ -40,6 +40,8 @@ public class Project {
     @Column(nullable = false, name = "project_name", length = 100)
     private String projectName;
 
+    private String repositoryUrl;
+
     @CreationTimestamp
     @Column(name="created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -52,7 +54,7 @@ public class Project {
     @JoinColumn(name = "user_id", nullable = false)// Maps to user id field in User class
     private User user;
 
-    @OneToMany(mappedBy = "deployment", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "project", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Deployment> deployments = new ArrayList<>();
 
 }

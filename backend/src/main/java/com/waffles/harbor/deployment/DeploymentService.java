@@ -3,8 +3,6 @@ package com.waffles.harbor.deployment;
 import com.waffles.harbor.git.GitService;
 import com.waffles.harbor.project.Project;
 import com.waffles.harbor.project.ProjectRepository;
-import com.waffles.harbor.user.User;
-import com.waffles.harbor.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +19,7 @@ public class DeploymentService {
     private final GitService gitService;
 
     public List<Deployment> getAllDeployments(UUID projectId){
-        return deploymentRepository.findByProjectIdOrderByCreatedAtDesc(projectId);
+        return deploymentRepository.findByProject_ProjectIdOrderByCreatedAtDesc(projectId);
     }
 
     public Deployment createDeployment(UUID projectId, String commitHash){
@@ -41,7 +39,7 @@ public class DeploymentService {
 //
 //        String filePath = generateFilePath(deploymentId);
 //        Deployment deployment = deploymentRepository.findById(deploymentId).orElseThrow();
-//        gitService.cloneRepository();
+//        gitService.cloneRepository(deployment.getProject().getRepositoryUrl(), filePath);
 //    }
 
     private String generateFilePath(UUID deploymentId){

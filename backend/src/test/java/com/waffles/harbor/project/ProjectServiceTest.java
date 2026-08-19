@@ -163,4 +163,90 @@ public class ProjectServiceTest {
         verify(projectRepository).findByUserAndProjectId(user,projectId);
     }
 
+    @Test
+    void shouldAddRepositoryUrlSuccessfully(){
+
+        User user = createUser("happy");
+        Project project = createProject("hp", user);
+
+        UUID projectId = UUID.randomUUID();
+        project.setProjectId(projectId);
+
+        String repositoryUrl = "https://github.com/Vedanth81106/docs.git";
+
+        when(projectRepository.findByUserAndProjectId(user, projectId))
+                .thenReturn(Optional.of(project));
+
+        when(projectRepository.save(any(Project.class)))
+                .thenReturn(project);
+
+        ProjectResponse projectResponse =
+                projectService.addRepositoryUrl(user, projectId, repositoryUrl);
+
+        verify(projectRepository).findByUserAndProjectId(user, projectId);
+
+        ArgumentCaptor<Project> captor = ArgumentCaptor.forClass(Project.class);
+        verify(projectRepository).save(captor.capture());
+
+        Project savedProject = captor.getValue();
+
+        assertEquals(repositoryUrl, savedProject.getRepositoryUrl());
+        assertEquals("hp", savedProject.getProjectName());
+        assertEquals(user, savedProject.getUser());
+
+        assertNotNull(projectResponse);
+        assertEquals(projectId, projectResponse.getProjectId());
+        assertEquals("hp", projectResponse.getProjectName());
+        assertEquals(repositoryUrl, projectResponse.getRepositoryUrl());
+    }
+
+    @Test
+    void shouldRejectAddingRepositoryUrlWhenProjectDoesNotExist(){
+
+        User user = createUser("sad");
+        UUID projectId = UUID.randomUUID();
+
+        String repositoryUrl = "https://github.com/Vedanth81106/docs.git";
+
+        when(projectRepository.findByUserAndProjectId(user, projectId))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                ProjectNotFoundException.class,
+                () -> projectService.addRepositoryUrl(
+                        user,
+                        projectId,
+                        repositoryUrl
+                )
+        );
+
+        verify(projectRepository).findByUserAndProjectId(user, projectId);
+        verify(projectRepository, never()).save(any(Project.class));
+    }
+
+    @Test
+    void shouldAddRepositoryUrlToProjectWithoutExistingRepository(){
+
+        User user = createUser("test");
+        Project project = createProject("test-project", user);
+
+        UUID projectId = UUID.randomUUID();
+        project.setProjectId(projectId);
+        project.setRepositoryUrl(null);
+
+        String repositoryUrl = "https://github.com/Vedanth81106/docs.git";
+
+        when(projectRepository.findByUserAndProjectId(user, projectId))
+                .thenReturn(Optional.of(project));
+
+        when(projectRepository.save(any(Project.class)))
+                .thenReturn(project);
+
+        ProjectResponse response =
+                projectService.addRepositoryUrl(user, projectId, repositoryUrl);
+
+        assertEquals(repositoryUrl, response.getRepositoryUrl());
+        verify(projectRepository).save(project);
+    }
+
 }

@@ -15,4 +15,5 @@ public class ProjectResponse {
 
     private UUID projectId;
     private String projectName;
+    private String repositoryUrl;
 }

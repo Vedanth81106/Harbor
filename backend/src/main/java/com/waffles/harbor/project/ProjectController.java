@@ -38,4 +38,12 @@ public class ProjectController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(projectService.createProject(user, request));
     }
+
+    @PutMapping("/{projectId}")
+    public ResponseEntity<ProjectResponse> addRepoUrl(@AuthenticationPrincipal User user,
+                                                      @PathVariable UUID projectId,
+                                                      @Valid @RequestBody RepositoryRequest request){
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(projectService.addRepositoryUrl(user, projectId, request.getRepositoryUrl()));
+    }
 }

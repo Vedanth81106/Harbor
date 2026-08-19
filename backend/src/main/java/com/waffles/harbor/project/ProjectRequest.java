@@ -16,4 +16,10 @@ public class ProjectRequest {
     @NotBlank(message = "Project name cannot be blank!")
     @Size(min = 3,max = 100)
     private String projectName;
+
+    private String repositoryUrl;
+
+    public ProjectRequest(String projectName){
+        this.projectName = projectName;
+    }
 }

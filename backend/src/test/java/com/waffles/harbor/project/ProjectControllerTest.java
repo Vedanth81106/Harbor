@@ -1,6 +1,7 @@
 package com.waffles.harbor.project;
 
 import com.waffles.harbor.auth.Role;
+import com.waffles.harbor.exception.ProjectNotFoundException;
 import com.waffles.harbor.security.JwtService;
 import com.waffles.harbor.user.User;
 import com.waffles.harbor.user.UserRepository;
@@ -223,5 +224,125 @@ class ProjectControllerTest {
 
         verify(projectService, never())
                 .getAllProjectsByUser(any(User.class));
+    }
+
+    @Test
+    void shouldAddRepositoryUrlSuccessfully() throws Exception {
+
+        User user = createUser("happy");
+
+        UUID projectId = UUID.randomUUID();
+
+        ProjectResponse projectResponse =
+                ProjectResponse.builder()
+                        .projectId(projectId)
+                        .projectName("happy-project")
+                        .repositoryUrl("https://github.com/Vedanth81106/docs.git")
+                        .build();
+
+        when(projectService.addRepositoryUrl(
+                user,
+                projectId,
+                "https://github.com/Vedanth81106/docs.git"
+        )).thenReturn(projectResponse);
+
+        mockMvc.perform(
+                        put("/projects/" + projectId)
+                                .with(csrf())
+                                .with(authentication(
+                                        new UsernamePasswordAuthenticationToken(
+                                                user,
+                                                null,
+                                                user.getAuthorities()
+                                        )
+                                ))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                {
+                                    "repositoryUrl":"https://github.com/Vedanth81106/docs.git"
+                                }
+                                """)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projectName").value("happy-project"))
+                .andExpect(jsonPath("$.repositoryUrl")
+                        .value("https://github.com/Vedanth81106/docs.git"));
+
+        verify(projectService).addRepositoryUrl(
+                user,
+                projectId,
+                "https://github.com/Vedanth81106/docs.git"
+        );
+    }
+
+    @Test
+    void shouldRejectBlankRepositoryUrl() throws Exception {
+
+        User user = createUser("happy");
+        UUID projectId = UUID.randomUUID();
+
+        mockMvc.perform(
+                        put("/projects/" + projectId)
+                                .with(csrf())
+                                .with(authentication(
+                                        new UsernamePasswordAuthenticationToken(
+                                                user,
+                                                null,
+                                                user.getAuthorities()
+                                        )
+                                ))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                {
+                                    "repositoryUrl":""
+                                }
+                                """)
+                )
+                .andExpect(status().isBadRequest());
+
+        verify(projectService, never())
+                .addRepositoryUrl(
+                        any(User.class),
+                        any(UUID.class),
+                        anyString()
+                );
+    }
+
+    @Test
+    void shouldRejectAddingRepositoryUrlWhenProjectDoesNotExist() throws Exception {
+
+        User user = createUser("sad");
+        UUID projectId = UUID.randomUUID();
+
+        when(projectService.addRepositoryUrl(
+                user,
+                projectId,
+                "https://github.com/Vedanth81106/docs.git"
+        )).thenThrow(new ProjectNotFoundException());
+
+        mockMvc.perform(
+                        put("/projects/" + projectId)
+                                .with(csrf())
+                                .with(authentication(
+                                        new UsernamePasswordAuthenticationToken(
+                                                user,
+                                                null,
+                                                user.getAuthorities()
+                                        )
+                                ))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                {
+                                    "repositoryUrl":"https://github.com/Vedanth81106/docs.git"
+                                }
+                                """)
+                )
+                .andExpect(status().isNotFound());
+
+        verify(projectService).addRepositoryUrl(
+                user,
+                projectId,
+                "https://github.com/Vedanth81106/docs.git"
+        );
     }
 }

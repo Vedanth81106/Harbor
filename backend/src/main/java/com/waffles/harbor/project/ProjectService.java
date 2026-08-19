@@ -23,6 +23,7 @@ public class ProjectService {
         var project = Project.builder()
                 .user(user)
                 .projectName(projectRequest.getProjectName())
+                .repositoryUrl(projectRequest.getRepositoryUrl())
                 .build();
 
         Project savedProject = projectRepository.save(project);
@@ -47,11 +48,28 @@ public class ProjectService {
         return toResponse(project);
     }
 
+    public ProjectResponse addRepositoryUrl(
+            User user,
+            UUID projectId,
+            String repositoryUrl
+    ) {
+        Project project = projectRepository
+                .findByUserAndProjectId(user, projectId)
+                .orElseThrow(ProjectNotFoundException::new);
+
+        project.setRepositoryUrl(repositoryUrl);
+
+        Project savedProject = projectRepository.save(project);
+
+        return toResponse(savedProject);
+    }
+
     private ProjectResponse toResponse(Project project){
 
         return ProjectResponse.builder()
                 .projectId(project.getProjectId())
                 .projectName(project.getProjectName())
+                .repositoryUrl(project.getRepositoryUrl())
                 .build();
     }
 }
