@@ -9,14 +9,14 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/deployment")
+@RequestMapping("/deployments")
 @RequiredArgsConstructor
 public class DeploymentController {
 
     private final DeploymentService deploymentService;
 
     @GetMapping
-    public ResponseEntity<List<Deployment>> getAllDeployments(
+    public ResponseEntity<List<DeploymentResponse>> getAllDeployments(
             @RequestParam UUID projectId
     ) {
         return ResponseEntity.ok(
@@ -25,7 +25,7 @@ public class DeploymentController {
     }
 
     @PostMapping
-    public ResponseEntity<Deployment> createDeployment(
+    public ResponseEntity<DeploymentResponse> createDeployment(
             @RequestParam UUID projectId,
             @RequestParam String commitHash
     ) {

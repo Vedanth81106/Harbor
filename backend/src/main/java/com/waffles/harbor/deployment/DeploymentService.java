@@ -21,11 +21,15 @@ public class DeploymentService {
     private final GitService gitService;
     private final DockerService dockerService;
 
-    public List<Deployment> getAllDeployments(UUID projectId){
-        return deploymentRepository.findByProject_ProjectIdOrderByCreatedAtDesc(projectId);
+    public List<DeploymentResponse> getAllDeployments(UUID projectId) {
+        return deploymentRepository
+                .findByProject_ProjectIdOrderByCreatedAtDesc(projectId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
-    public Deployment createDeployment(UUID projectId, String commitHash){
+    public DeploymentResponse createDeployment(UUID projectId, String commitHash){
 
         Project project = projectRepository.findById(projectId).orElseThrow();
         Deployment deployment = Deployment.builder()
@@ -35,7 +39,9 @@ public class DeploymentService {
                 .status(DeploymentStatus.QUEUED)
                 .build();
 
-        return deploymentRepository.save(deployment);
+        Deployment savedDeployment =  deploymentRepository.save(deployment);
+
+        return toResponse(savedDeployment);
     }
 
     public String deploy(UUID deploymentId) throws Exception {
@@ -84,5 +90,14 @@ public class DeploymentService {
         ).toString();
     }
 
+    private DeploymentResponse toResponse(Deployment deployment) {
 
+        return DeploymentResponse.builder()
+                .deploymentId(deployment.getDeploymentId())
+                .projectId(deployment.getProject().getProjectId())
+                .status(deployment.getStatus())
+                .commitHash(deployment.getCommitHash())
+                .imageName(deployment.getImageName())
+                .build();
+    }
 }
