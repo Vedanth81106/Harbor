@@ -1,11 +1,13 @@
 package com.waffles.harbor.deployment;
 
+import com.waffles.harbor.docker.DockerService;
 import com.waffles.harbor.git.GitService;
 import com.waffles.harbor.project.Project;
 import com.waffles.harbor.project.ProjectRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
@@ -17,6 +19,7 @@ public class DeploymentService {
     private final DeploymentRepository deploymentRepository;
     private final ProjectRepository projectRepository;
     private final GitService gitService;
+    private final DockerService dockerService;
 
     public List<Deployment> getAllDeployments(UUID projectId){
         return deploymentRepository.findByProject_ProjectIdOrderByCreatedAtDesc(projectId);
@@ -35,12 +38,39 @@ public class DeploymentService {
         return deploymentRepository.save(deployment);
     }
 
-//    public Deployment startDeployment(UUID deploymentId){
-//
-//        String filePath = generateFilePath(deploymentId);
-//        Deployment deployment = deploymentRepository.findById(deploymentId).orElseThrow();
-//        gitService.cloneRepository(deployment.getProject().getRepositoryUrl(), filePath);
-//    }
+    public String deploy(UUID deploymentId) throws Exception {
+
+        Deployment deployment = deploymentRepository
+                .findById(deploymentId)
+                .orElseThrow();
+
+        String filePath = generateFilePath(deploymentId);
+
+        System.out.println("Cloning git repository...");
+        gitService.cloneRepository(
+                deployment.getProject().getRepositoryUrl(),
+                filePath
+        );
+
+        System.out.println("Building docker image...");
+        dockerService.buildImage(
+                filePath,
+                deployment.getImageName()
+        );
+
+        System.out.println("Creating container...");
+        String containerId = dockerService.createContainer(
+                deployment.getImageName(),
+                8081,
+                808,
+                "harbor-" + deploymentId
+        );
+
+        System.out.println("Starting container...");
+        dockerService.startContainer(containerId);
+
+        return containerId;
+    }
 
     private String generateFilePath(UUID deploymentId){
         Deployment deployment = deploymentRepository.findById(deploymentId).orElseThrow();
@@ -53,4 +83,6 @@ public class DeploymentService {
                 deploymentId.toString()
         ).toString();
     }
+
+
 }

@@ -1,12 +1,16 @@
 package com.waffles.harbor.docker;
 
 import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.BuildImageResultCallback;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.Ports;
 import org.springframework.stereotype.Service;
+
+import java.io.File;
+import java.util.Collections;
 
 @Service
 public class DockerService {
@@ -17,37 +21,40 @@ public class DockerService {
         this.dockerClient = dockerClient;
     }
 
-    public String createNginxContainer() throws InterruptedException {
-        dockerClient.pullImageCmd("nginx").withTag("latest").start().awaitCompletion();
+    public String buildImage(String filePath, String imageTag) {
 
-        ExposedPort tcp80 = ExposedPort.tcp(80);
+        return dockerClient.buildImageCmd()
+                .withBaseDirectory(new File(filePath))
+                .withTags(Collections.singleton(imageTag))
+                .exec(new BuildImageResultCallback())
+                .awaitImageId();
+    }
+
+    public String createContainer(String imageTag, int hostPort, int containerPort, String containerName){
+
+        ExposedPort internalPort = new ExposedPort(containerPort);
         Ports portBindings = new Ports();
-        portBindings.bind(tcp80, Ports.Binding.bindPort(8081));
+        portBindings.bind(internalPort, Ports.Binding.bindPort(hostPort));
 
-        CreateContainerResponse container = dockerClient.createContainerCmd("nginx")
-                .withName("nginx-container")
+        CreateContainerResponse containerResponse = dockerClient.createContainerCmd(imageTag)
+                .withName(containerName)
                 .withHostConfig(HostConfig.newHostConfig().withPortBindings(portBindings))
                 .exec();
 
-        return container.getId();
-
+        return containerResponse.getId();
     }
 
-    public String startNginxContainer() throws InterruptedException {
+    public void startContainer(String containerId) throws InterruptedException {
 
-        String containerId = createNginxContainer();
         dockerClient.startContainerCmd(containerId).exec();
-
-        return containerId;
     }
 
-    public String stopNginxContainer(String containerId){
+    public void stopContainer(String containerId){
 
         dockerClient.stopContainerCmd(containerId).exec();
-        return containerId;
     }
 
-    public void removeNginxContainer(String containerId){
+    public void removeContainer(String containerId){
 
         dockerClient.removeContainerCmd(containerId).exec();
     }

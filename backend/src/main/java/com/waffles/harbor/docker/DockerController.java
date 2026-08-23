@@ -16,18 +16,18 @@ public class DockerController{
         return dockerService.inspectContainerResponse(containerId);
     }
 
-    @PostMapping("/nginx/start")
-    public String startNginxContainer() throws InterruptedException{
-        return dockerService.startNginxContainer();
+    @PostMapping("/nginx/{containerId}/start")
+    public void startContainer(@PathVariable String containerId) throws InterruptedException{
+        dockerService.startContainer(containerId);
     }
 
     @PostMapping("/nginx/{containerId}/stop")
-    public String stopNginxContainer(@PathVariable String containerId){
-        return dockerService.stopNginxContainer(containerId);
+    public void stopContainer(@PathVariable String containerId){
+        dockerService.stopContainer(containerId);
     }
 
     @DeleteMapping("/nginx/{containerId}/delete")
-    public void deleteNginxContainer(@PathVariable String containerId){
-        dockerService.removeNginxContainer(containerId);
+    public void deleteContainer(@PathVariable String containerId){
+        dockerService.removeContainer(containerId);
     }
 }
