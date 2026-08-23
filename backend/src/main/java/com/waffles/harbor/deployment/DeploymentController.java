@@ -41,4 +41,15 @@ public class DeploymentController {
                 deploymentService.deploy(deploymentId)
         );
     }
+
+    @DeleteMapping("/{deploymentId}")
+    public ResponseEntity<Void> deleteDeployment(
+            @PathVariable UUID deploymentId
+    ) {
+
+        System.out.println("DELETE DEPLOYMENT: " + deploymentId);
+        deploymentService.deleteDeployment(deploymentId);
+
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -68,7 +68,7 @@ public class DeploymentService {
         String containerId = dockerService.createContainer(
                 deployment.getImageName(),
                 8081,
-                808,
+                8080,
                 "harbor-" + deploymentId
         );
 
@@ -83,7 +83,7 @@ public class DeploymentService {
         Project project = deployment.getProject();
 
         return Path.of(
-                "/Harbor",
+                "/home/vedanth/Harbor/tmp",
                 project.getUser().getUserId().toString(),
                 project.getProjectId().toString(),
                 deploymentId.toString()
@@ -99,5 +99,39 @@ public class DeploymentService {
                 .commitHash(deployment.getCommitHash())
                 .imageName(deployment.getImageName())
                 .build();
+    }
+
+    public void deleteDeployment(UUID deploymentId) {
+
+        Deployment deployment = deploymentRepository
+                .findById(deploymentId)
+                .orElseThrow();
+
+        String filePath = generateFilePath(deploymentId);
+
+        File deploymentDirectory = new File(filePath);
+
+        if (deploymentDirectory.exists()) {
+            deleteDirectory(deploymentDirectory);
+        }
+
+        deploymentRepository.delete(deployment);
+    }
+
+    private void deleteDirectory(File directory) {
+
+        File[] files = directory.listFiles();
+
+        if (files != null) {
+            for (File file : files) {
+                if (file.isDirectory()) {
+                    deleteDirectory(file);
+                } else {
+                    file.delete();
+                }
+            }
+        }
+
+        directory.delete();
     }
 }
