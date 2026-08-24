@@ -18,7 +18,7 @@
 
 * Registration
 * Password hashing
-* Login
+* Login 
 * JWT
 * Spring Security configuration
 

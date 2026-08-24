@@ -36,6 +36,9 @@ services:
         condition: service_healthy
     networks:
       - harbor-network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/vedanth/Harbor/tmp:/home/tmp/Harbor
 
 volumes:
   harbor_db_data:
