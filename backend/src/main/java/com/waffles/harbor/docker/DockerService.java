@@ -21,20 +21,14 @@ public class DockerService {
         this.dockerClient = dockerClient;
     }
 
-    public void buildImage(String filePath, String imageTag) {
+    public String buildImage(String filePath, String imageTag) {
 
         File buildDir = new File(filePath);
         File dockerfile = new File(buildDir, "Dockerfile");
 
-        System.out.println("Build dir: " + buildDir.getAbsolutePath());
-        System.out.println("Build dir exists: " + buildDir.exists());
-        System.out.println("Build dir is directory: " + buildDir.isDirectory());
-        System.out.println("Dockerfile: " + dockerfile.getAbsolutePath());
-        System.out.println("Dockerfile exists: " + dockerfile.exists());
-        System.out.println("Dockerfile is file: " + dockerfile.isFile());
-
-        dockerClient.buildImageCmd()
+        return dockerClient.buildImageCmd()
                 .withBaseDirectory(buildDir)
+                .withDockerfile(dockerfile)
                 .withTags(Collections.singleton(imageTag))
                 .exec(new BuildImageResultCallback())
                 .awaitImageId();
