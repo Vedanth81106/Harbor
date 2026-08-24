@@ -63,6 +63,10 @@ public class DockerService {
         dockerClient.removeContainerCmd(containerId).exec();
     }
 
+    public void removeImage(String imageName) {
+        dockerClient.removeImageCmd(imageName).exec();
+    }
+
     public InspectContainerResponse inspectContainerResponse(String containerId) {
 
         // Contains container metadata, state, networking, ports,

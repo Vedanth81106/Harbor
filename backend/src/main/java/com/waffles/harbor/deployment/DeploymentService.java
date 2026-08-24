@@ -1,6 +1,7 @@
 package com.waffles.harbor.deployment;
 
 import com.waffles.harbor.docker.DockerService;
+import com.waffles.harbor.git.GitCommit;
 import com.waffles.harbor.git.GitService;
 import com.waffles.harbor.project.Project;
 import com.waffles.harbor.project.ProjectRepository;
@@ -29,17 +30,15 @@ public class DeploymentService {
                 .toList();
     }
 
-    public DeploymentResponse createDeployment(UUID projectId, String commitHash){
+    public DeploymentResponse createDeployment(UUID projectId){
 
         Project project = projectRepository.findById(projectId).orElseThrow();
         Deployment deployment = Deployment.builder()
                 .project(project)
-                .commitHash(commitHash)
-                .imageName(project.getProjectName()+":"+commitHash)
                 .status(DeploymentStatus.QUEUED)
                 .build();
 
-        Deployment savedDeployment =  deploymentRepository.save(deployment);
+        Deployment savedDeployment = deploymentRepository.save(deployment);
 
         return toResponse(savedDeployment);
     }
@@ -50,44 +49,50 @@ public class DeploymentService {
                 .findById(deploymentId)
                 .orElseThrow();
 
-        String filePath = generateFilePath(deploymentId);
+        try {
+            String filePath = createDirectory(deployment);
 
-        System.out.println("Cloning git repository...");
-        gitService.cloneRepository(
-                deployment.getProject().getRepositoryUrl(),
-                filePath
-        );
+            deployment.setStatus(DeploymentStatus.BUILDING);
+            deploymentRepository.save(deployment);
 
-        System.out.println("Building docker image...");
-        dockerService.buildImage(
-                filePath,
-                deployment.getImageName()
-        );
+            gitService.cloneRepository(
+                    deployment.getProject().getRepositoryUrl(),
+                    filePath
+            );
 
-        System.out.println("Creating container...");
-        String containerId = dockerService.createContainer(
-                deployment.getImageName(),
-                8081,
-                8080,
-                "harbor-" + deploymentId
-        );
+            List<GitCommit> gitCommits = gitService.getCommits(filePath);
+            String latestCommitHash = gitCommits.getFirst().getHash();
+            deployment.setCommitHash(latestCommitHash);
+            deployment.setImageName(deployment.getProject().getProjectName().replace("\\s+","-")+":"+latestCommitHash);
+            deploymentRepository.save(deployment);
 
-        System.out.println("Starting container...");
-        dockerService.startContainer(containerId);
+            dockerService.buildImage(
+                    filePath,
+                    deployment.getImageName()
+            );
 
-        return containerId;
-    }
+            String containerId = dockerService.createContainer(
+                    deployment.getImageName(),
+                    8081,
+                    8080,
+                    "harbor-" + deploymentId
+            );
 
-    private String generateFilePath(UUID deploymentId){
-        Deployment deployment = deploymentRepository.findById(deploymentId).orElseThrow();
-        Project project = deployment.getProject();
+            dockerService.startContainer(containerId);
 
-        return Path.of(
-                "/home/vedanth/Harbor/tmp",
-                project.getUser().getUserId().toString(),
-                project.getProjectId().toString(),
-                deploymentId.toString()
-        ).toString();
+            deployment.setStatus(DeploymentStatus.READY);
+            deployment.setContainerId(containerId);
+            deploymentRepository.save(deployment);
+
+            return containerId;
+
+        } catch (Exception e) {
+
+            deployment.setStatus(DeploymentStatus.FAILED);
+            deploymentRepository.save(deployment);
+
+            throw e;
+        }
     }
 
     private DeploymentResponse toResponse(Deployment deployment) {
@@ -107,15 +112,36 @@ public class DeploymentService {
                 .findById(deploymentId)
                 .orElseThrow();
 
-        String filePath = generateFilePath(deploymentId);
+        String containerId = deployment.getContainerId();
+        String filePath = createDirectory(deployment);
 
         File deploymentDirectory = new File(filePath);
+
+        if (containerId != null) {
+            dockerService.stopContainer(containerId);
+            dockerService.removeContainer(containerId);
+        }
+
+        if (deployment.getImageName() != null) {
+            dockerService.removeImage(deployment.getImageName());
+        }
 
         if (deploymentDirectory.exists()) {
             deleteDirectory(deploymentDirectory);
         }
 
         deploymentRepository.delete(deployment);
+    }
+
+    private String createDirectory(Deployment deployment) {
+        Project project = deployment.getProject();
+
+        return Path.of(
+                "/home/vedanth/Harbor/tmp",
+                project.getUser().getUserId().toString(),
+                project.getProjectId().toString(),
+                deployment.getDeploymentId().toString()
+        ).toString();
     }
 
     private void deleteDirectory(File directory) {

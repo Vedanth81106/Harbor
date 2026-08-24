@@ -26,6 +26,8 @@ public class Deployment {
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
 
+    private String containerId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DeploymentStatus status;

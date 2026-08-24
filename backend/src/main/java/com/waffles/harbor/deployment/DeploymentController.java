@@ -30,7 +30,7 @@ public class DeploymentController {
             @RequestParam String commitHash
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(deploymentService.createDeployment(projectId, commitHash));
+                .body(deploymentService.createDeployment(projectId));
     }
 
     @PostMapping("/deploy")
