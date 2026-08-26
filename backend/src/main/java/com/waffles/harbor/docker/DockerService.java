@@ -1,9 +1,7 @@
 package com.waffles.harbor.docker;
 
 import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.command.BuildImageResultCallback;
-import com.github.dockerjava.api.command.CreateContainerResponse;
-import com.github.dockerjava.api.command.InspectContainerResponse;
+import com.github.dockerjava.api.command.*;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.Ports;
@@ -21,12 +19,12 @@ public class DockerService {
         this.dockerClient = dockerClient;
     }
 
-    public String buildImage(String filePath, String imageTag) {
+    public void buildImage(String filePath, String imageTag) {
 
         File buildDir = new File(filePath);
         File dockerfile = new File(buildDir, "Dockerfile");
 
-        return dockerClient.buildImageCmd()
+        dockerClient.buildImageCmd()
                 .withBaseDirectory(buildDir)
                 .withDockerfile(dockerfile)
                 .withTags(Collections.singleton(imageTag))
@@ -72,5 +70,31 @@ public class DockerService {
         // Contains container metadata, state, networking, ports,
         // environment, mounts, restart policy, command, exit code, and health.
         return dockerClient.inspectContainerCmd(containerId).exec();
+    }
+
+    public int getExposedImagePort(String imageName){
+
+        InspectImageResponse imageResponse = dockerClient.inspectImageCmd(imageName).exec();
+        ExposedPort[] ports = imageResponse.getConfig().getExposedPorts();
+
+        if (ports == null || ports.length == 0) {
+            throw new IllegalStateException(
+                    "Could not find a port to expose from the docker image!"
+            );
+        }
+
+        return ports[0].getPort();
+    }
+
+    public int getDockerContainerPort(String containerId, int containerPort){
+
+        InspectContainerResponse containerResponse = dockerClient.inspectContainerCmd(containerId).exec();
+        Ports bindings = containerResponse.getNetworkSettings().getPorts();
+        if(bindings == null || bindings.getBindings() == null) throw new IllegalStateException("No bindings found for container");
+
+        Ports.Binding[] hostBinding = bindings.getBindings().get(ExposedPort.tcp(containerPort));
+        if(hostBinding == null || hostBinding.length == 0) throw new IllegalStateException("Could not find port binding!");
+
+        return Integer.parseInt(hostBinding[0].getHostPortSpec());
     }
 }

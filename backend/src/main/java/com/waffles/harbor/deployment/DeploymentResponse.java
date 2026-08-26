@@ -18,5 +18,5 @@ public class DeploymentResponse {
     private DeploymentStatus status;
     private String commitHash;
     private String imageName;
-
+    private int hostPort;
 }

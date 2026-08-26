@@ -6,6 +6,7 @@ import com.waffles.harbor.git.GitService;
 import com.waffles.harbor.project.Project;
 import com.waffles.harbor.project.ProjectRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -16,6 +17,9 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class DeploymentService {
+
+    @Value("${configuration-path}")
+    private String path;
 
     private final DeploymentRepository deploymentRepository;
     private final ProjectRepository projectRepository;
@@ -43,48 +47,28 @@ public class DeploymentService {
         return toResponse(savedDeployment);
     }
 
-    public String deploy(UUID deploymentId) throws Exception {
+    public DeploymentResponse deploy(UUID deploymentId) throws Exception {
 
         Deployment deployment = deploymentRepository
                 .findById(deploymentId)
                 .orElseThrow();
 
         try {
-            String filePath = createDirectory(deployment);
-
             deployment.setStatus(DeploymentStatus.BUILDING);
             deploymentRepository.save(deployment);
 
-            gitService.cloneRepository(
-                    deployment.getProject().getRepositoryUrl(),
-                    filePath
-            );
+            String filePath = createDirectory(deployment);
 
-            List<GitCommit> gitCommits = gitService.getCommits(filePath);
-            String latestCommitHash = gitCommits.getFirst().getHash();
-            deployment.setCommitHash(latestCommitHash);
-            deployment.setImageName(deployment.getProject().getProjectName().replace("\\s+","-")+":"+latestCommitHash);
-            deploymentRepository.save(deployment);
+            cloneRepository(deployment, filePath);
+            buildDeploymentImage(deployment, filePath);
 
-            dockerService.buildImage(
-                    filePath,
-                    deployment.getImageName()
-            );
+            String containerId = startDeploymentContainer(deployment);
 
-            String containerId = dockerService.createContainer(
-                    deployment.getImageName(),
-                    8081,
-                    8080,
-                    "harbor-" + deploymentId
-            );
-
-            dockerService.startContainer(containerId);
-
-            deployment.setStatus(DeploymentStatus.READY);
             deployment.setContainerId(containerId);
+            deployment.setStatus(DeploymentStatus.READY);
             deploymentRepository.save(deployment);
 
-            return containerId;
+            return toResponse(deployment);
 
         } catch (Exception e) {
 
@@ -93,17 +77,6 @@ public class DeploymentService {
 
             throw e;
         }
-    }
-
-    private DeploymentResponse toResponse(Deployment deployment) {
-
-        return DeploymentResponse.builder()
-                .deploymentId(deployment.getDeploymentId())
-                .projectId(deployment.getProject().getProjectId())
-                .status(deployment.getStatus())
-                .commitHash(deployment.getCommitHash())
-                .imageName(deployment.getImageName())
-                .build();
     }
 
     public void deleteDeployment(UUID deploymentId) {
@@ -133,11 +106,66 @@ public class DeploymentService {
         deploymentRepository.delete(deployment);
     }
 
+    private void cloneRepository(
+            Deployment deployment,
+            String filePath
+    ) throws Exception {
+
+        String repositoryUrl = deployment.getProject().getRepositoryUrl();
+
+        if (repositoryUrl == null || repositoryUrl.isBlank()) {
+            throw new IllegalStateException("Project does not have a repository configured");
+        }
+
+        gitService.cloneRepository(repositoryUrl, filePath);
+    }
+
+    private void buildDeploymentImage(
+            Deployment deployment,
+            String filePath
+    ) throws Exception {
+
+        GitCommit latestCommit = gitService.getLatestCommit(filePath);
+        deployment.setCommitHash(latestCommit.getHash());
+
+        deployment.setImageName(
+                deployment.getProject().getProjectId() + ":" + latestCommit.getHash()
+        );
+
+        deploymentRepository.save(deployment);
+
+        dockerService.buildImage(
+                filePath,
+                deployment.getImageName()
+        );
+    }
+
+    private String startDeploymentContainer(
+            Deployment deployment
+    ) throws Exception {
+
+        int containerPort = dockerService.getExposedImagePort(deployment.getImageName());
+        String containerId = dockerService.createContainer(
+                deployment.getImageName(),
+                0,
+                containerPort,
+                "harbor-" + deployment.getDeploymentId()
+        );
+
+        dockerService.startContainer(containerId);
+
+        int assignedHostPort = dockerService.getDockerContainerPort(containerId, containerPort);
+        deployment.setAssignedHostPort(assignedHostPort);
+        deploymentRepository.save(deployment);
+
+        return containerId;
+    }
+
     private String createDirectory(Deployment deployment) {
         Project project = deployment.getProject();
 
         return Path.of(
-                "/home/vedanth/Harbor/tmp",
+                path,
                 project.getUser().getUserId().toString(),
                 project.getProjectId().toString(),
                 deployment.getDeploymentId().toString()
@@ -160,4 +188,17 @@ public class DeploymentService {
 
         directory.delete();
     }
+
+    private DeploymentResponse toResponse(Deployment deployment) {
+
+        return DeploymentResponse.builder()
+                .deploymentId(deployment.getDeploymentId())
+                .projectId(deployment.getProject().getProjectId())
+                .status(deployment.getStatus())
+                .commitHash(deployment.getCommitHash())
+                .imageName(deployment.getImageName())
+                .hostPort(deployment.getAssignedHostPort())
+                .build();
+    }
+
 }

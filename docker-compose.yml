@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: harbor_db
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -31,6 +31,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${DB_USER}
       SPRING_DATASOURCE_PASSWORD: ${DB_PWD}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      CONFIG_PATH: /home/vedanth/Harbor/tmp
     depends_on:
       db:
         condition: service_healthy

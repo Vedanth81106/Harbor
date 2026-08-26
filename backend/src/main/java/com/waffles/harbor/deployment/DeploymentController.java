@@ -26,15 +26,14 @@ public class DeploymentController {
 
     @PostMapping
     public ResponseEntity<DeploymentResponse> createDeployment(
-            @RequestParam UUID projectId,
-            @RequestParam String commitHash
+            @RequestParam UUID projectId
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(deploymentService.createDeployment(projectId));
     }
 
     @PostMapping("/deploy")
-    public ResponseEntity<String> deploy(
+    public ResponseEntity<DeploymentResponse> deploy(
             @RequestParam UUID deploymentId
     ) throws Exception {
         return ResponseEntity.ok(

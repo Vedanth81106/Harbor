@@ -38,8 +38,24 @@ public class GitService {
         }
 
         return commits;
+    }
 
-        // to get latest commit just do commmits.get(0);
+    public GitCommit getLatestCommit(String localRepoPath) throws Exception {
+        try (Git git = Git.open(new File(localRepoPath))) {
+
+            RevCommit commit = git.log()
+                    .setMaxCount(1)
+                    .call()
+                    .iterator()
+                    .next();
+
+            return GitCommit.builder()
+                    .hash(commit.getName())
+                    .message(commit.getShortMessage())
+                    .author(commit.getAuthorIdent().getName())
+                    .date(commit.getAuthorIdent().getWhen().toInstant())
+                    .build();
+        }
     }
 
 }
