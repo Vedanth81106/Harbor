@@ -34,29 +34,18 @@ public class DeploymentService {
                 .toList();
     }
 
-    public DeploymentResponse createDeployment(UUID projectId){
+    public DeploymentResponse deploy(UUID projectId) throws Exception {
 
         Project project = projectRepository.findById(projectId).orElseThrow();
+
         Deployment deployment = Deployment.builder()
                 .project(project)
-                .status(DeploymentStatus.QUEUED)
+                .status(DeploymentStatus.BUILDING)
                 .build();
 
-        Deployment savedDeployment = deploymentRepository.save(deployment);
-
-        return toResponse(savedDeployment);
-    }
-
-    public DeploymentResponse deploy(UUID deploymentId) throws Exception {
-
-        Deployment deployment = deploymentRepository
-                .findById(deploymentId)
-                .orElseThrow();
+        deploymentRepository.save(deployment);
 
         try {
-            deployment.setStatus(DeploymentStatus.BUILDING);
-            deploymentRepository.save(deployment);
-
             String filePath = createDirectory(deployment);
 
             cloneRepository(deployment, filePath);
@@ -66,6 +55,7 @@ public class DeploymentService {
 
             deployment.setContainerId(containerId);
             deployment.setStatus(DeploymentStatus.READY);
+
             deploymentRepository.save(deployment);
 
             return toResponse(deployment);
