@@ -1,5 +1,6 @@
 package com.waffles.harbor.project;
 
+import com.waffles.harbor.deployment.DeploymentService;
 import com.waffles.harbor.user.User;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import java.util.UUID;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final DeploymentService deploymentService;
 
     @GetMapping
     public ResponseEntity<List<ProjectResponse>> getAllProjectsByUser(@AuthenticationPrincipal User user){
@@ -45,5 +47,14 @@ public class ProjectController {
                                                       @Valid @RequestBody RepositoryRequest request){
         return ResponseEntity.status(HttpStatus.OK)
                 .body(projectService.addRepositoryUrl(user, projectId, request.getRepositoryUrl()));
+    }
+
+    @DeleteMapping("/projects/{projectId}/deployments")
+    public ResponseEntity<Void> deleteAllDeployments(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID projectId
+    ) {
+        deploymentService.deleteAllDeploymentsForProject(user, projectId);
+        return ResponseEntity.noContent().build();
     }
 }

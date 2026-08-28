@@ -12,4 +12,5 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     Optional<Project> findByUserAndProjectNameIgnoreCase(User user, String projectName);
     Optional<Project> findByUserAndProjectId(User user, UUID projectId);
     boolean existsByUserAndProjectNameIgnoreCase(User user, String projectName);
+    boolean existsByUserAndProjectId(User user, UUID projectId);
 }

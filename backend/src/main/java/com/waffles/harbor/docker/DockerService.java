@@ -2,6 +2,7 @@ package com.waffles.harbor.docker;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.*;
+import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.Ports;
@@ -51,18 +52,39 @@ public class DockerService {
         dockerClient.startContainerCmd(containerId).exec();
     }
 
-    public void stopContainer(String containerId){
+    public void stopContainer(String containerId) {
 
-        dockerClient.stopContainerCmd(containerId).exec();
+        try {
+            InspectContainerResponse container =
+                    dockerClient.inspectContainerCmd(containerId).exec();
+
+            if (Boolean.TRUE.equals(container.getState().getRunning())) {
+                dockerClient.stopContainerCmd(containerId).exec();
+            }
+
+        } catch (NotFoundException e) {
+            System.out.println(
+                    "Container " + containerId + " already removed."
+            );
+        }
     }
 
-    public void removeContainer(String containerId){
-
-        dockerClient.removeContainerCmd(containerId).exec();
+    public void removeContainer(String containerId) {
+        try {
+            dockerClient.removeContainerCmd(containerId).exec();
+        } catch (NotFoundException e) {
+            System.out.println("Container " + containerId + " already removed.");
+        }
     }
 
     public void removeImage(String imageName) {
-        dockerClient.removeImageCmd(imageName).exec();
+        try {
+            InspectImageResponse image = dockerClient.inspectImageCmd(imageName).exec();
+            dockerClient.removeImageCmd(image.getId()).exec();
+
+        } catch (NotFoundException e) {
+            System.out.println("Image " + imageName + " does not exist.");
+        }
     }
 
     public InspectContainerResponse inspectContainerResponse(String containerId) {

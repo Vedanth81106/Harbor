@@ -1,10 +1,13 @@
 package com.waffles.harbor.deployment;
 
 import com.waffles.harbor.docker.DockerService;
+import com.waffles.harbor.exception.DeploymentNotFoundException;
+import com.waffles.harbor.exception.ProjectNotFoundException;
 import com.waffles.harbor.git.GitCommit;
 import com.waffles.harbor.git.GitService;
 import com.waffles.harbor.project.Project;
 import com.waffles.harbor.project.ProjectRepository;
+import com.waffles.harbor.user.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -26,7 +29,9 @@ public class DeploymentService {
     private final GitService gitService;
     private final DockerService dockerService;
 
-    public List<DeploymentResponse> getAllDeployments(UUID projectId) {
+    public List<DeploymentResponse> getAllDeployments(User user, UUID projectId) {
+
+        if(!projectRepository.existsByUserAndProjectId(user,projectId)) throw new ProjectNotFoundException();
         return deploymentRepository
                 .findByProject_ProjectIdOrderByCreatedAtDesc(projectId)
                 .stream()
@@ -34,9 +39,9 @@ public class DeploymentService {
                 .toList();
     }
 
-    public DeploymentResponse deploy(UUID projectId) throws Exception {
+    public DeploymentResponse deploy(User user, UUID projectId) throws Exception {
 
-        Project project = projectRepository.findById(projectId).orElseThrow();
+        Project project = projectRepository.findByUserAndProjectId(user, projectId).orElseThrow(ProjectNotFoundException::new);
 
         Deployment deployment = Deployment.builder()
                 .project(project)
@@ -46,7 +51,7 @@ public class DeploymentService {
         deploymentRepository.save(deployment);
 
         try {
-            String filePath = createDirectory(deployment);
+            String filePath = getDeploymentDirectory(deployment);
 
             cloneRepository(deployment, filePath);
             buildDeploymentImage(deployment, filePath);
@@ -69,31 +74,43 @@ public class DeploymentService {
         }
     }
 
-    public void deleteDeployment(UUID deploymentId) {
+    public void deleteDeployment(User user,UUID deploymentId) {
 
         Deployment deployment = deploymentRepository
-                .findById(deploymentId)
-                .orElseThrow();
+                .findByDeploymentIdAndProject_User(deploymentId, user)
+                .orElseThrow(DeploymentNotFoundException::new);
 
-        String containerId = deployment.getContainerId();
-        String filePath = createDirectory(deployment);
-
+        String filePath = getDeploymentDirectory(deployment);
         File deploymentDirectory = new File(filePath);
-
-        if (containerId != null) {
-            dockerService.stopContainer(containerId);
-            dockerService.removeContainer(containerId);
-        }
-
-        if (deployment.getImageName() != null) {
-            dockerService.removeImage(deployment.getImageName());
-        }
-
+        deleteImagesAndContainers(deployment);
         if (deploymentDirectory.exists()) {
             deleteDirectory(deploymentDirectory);
         }
 
         deploymentRepository.delete(deployment);
+    }
+
+    public void deleteAllDeploymentsForProject(User user, UUID projectId){
+
+        Project project = projectRepository.findByUserAndProjectId(user, projectId)
+                .orElseThrow(ProjectNotFoundException::new);
+
+        for(Deployment deployment : project.getDeployments()){
+            deleteImagesAndContainers(deployment);
+        }
+
+        String projectPath = Path.of(
+                path,
+                project.getUser().getUserId().toString(),
+                project.getProjectId().toString()).toString();
+
+        File projectDirectory = new File(projectPath);
+
+        if (projectDirectory.exists()){
+            deleteDirectory(projectDirectory);
+        }
+        deploymentRepository.deleteAll(project.getDeployments());
+        project.getDeployments().clear();
     }
 
     private void cloneRepository(
@@ -151,7 +168,7 @@ public class DeploymentService {
         return containerId;
     }
 
-    private String createDirectory(Deployment deployment) {
+    private String getDeploymentDirectory(Deployment deployment) {
         Project project = deployment.getProject();
 
         return Path.of(
@@ -177,6 +194,21 @@ public class DeploymentService {
         }
 
         directory.delete();
+    }
+
+    private void deleteImagesAndContainers(Deployment deployment){
+        String containerId = deployment.getContainerId();
+
+        if (containerId != null) {
+            dockerService.stopContainer(containerId);
+            dockerService.removeContainer(containerId);
+        }
+
+        if (deployment.getImageName() != null &&
+                !deploymentRepository.existsByImageNameAndDeploymentIdNot(deployment.getImageName(), deployment.getDeploymentId())) {
+
+            dockerService.removeImage(deployment.getImageName());
+        }
     }
 
     private DeploymentResponse toResponse(Deployment deployment) {

@@ -1,8 +1,10 @@
 package com.waffles.harbor.deployment;
 
+import com.waffles.harbor.user.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,32 +17,43 @@ public class DeploymentController {
 
     private final DeploymentService deploymentService;
 
-    @GetMapping
+    @GetMapping("/{projectId}")
     public ResponseEntity<List<DeploymentResponse>> getAllDeployments(
-            @RequestParam UUID projectId
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID projectId
     ) {
         return ResponseEntity.ok(
-                deploymentService.getAllDeployments(projectId)
+                deploymentService.getAllDeployments(user, projectId)
         );
     }
 
-    @PostMapping("/deploy")
+    @PostMapping("/deploy/{projectId}")
     public ResponseEntity<DeploymentResponse> deploy(
-            @RequestParam UUID deploymentId
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID projectId
     ) throws Exception {
         return ResponseEntity.ok(
-                deploymentService.deploy(deploymentId)
+                deploymentService.deploy(user, projectId)
         );
     }
 
     @DeleteMapping("/{deploymentId}")
     public ResponseEntity<Void> deleteDeployment(
+            @AuthenticationPrincipal User user,
             @PathVariable UUID deploymentId
     ) {
 
-        System.out.println("DELETE DEPLOYMENT: " + deploymentId);
-        deploymentService.deleteDeployment(deploymentId);
+        deploymentService.deleteDeployment(user, deploymentId);
 
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{projectId}/deployments")
+    public ResponseEntity<Void> deleteAllDeployments(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID projectId
+    ) {
+        deploymentService.deleteAllDeploymentsForProject(user, projectId);
         return ResponseEntity.noContent().build();
     }
 }
