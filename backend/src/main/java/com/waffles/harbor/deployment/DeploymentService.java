@@ -14,8 +14,8 @@ import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -95,22 +95,31 @@ public class DeploymentService {
         Project project = projectRepository.findByUserAndProjectId(user, projectId)
                 .orElseThrow(ProjectNotFoundException::new);
 
-        for(Deployment deployment : project.getDeployments()){
-            deleteImagesAndContainers(deployment);
+        List<Deployment> deployments = new ArrayList<>(project.getDeployments());
+        Set<String> imageNames = deployments.stream()
+                .map(Deployment::getImageName)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+
+        for(Deployment deployment : deployments){
+
+            String containerId = deployment.getContainerId();
+
+            if(containerId != null){
+                dockerService.stopContainer(containerId);
+                dockerService.removeContainer(containerId);
+            }
         }
 
-        String projectPath = Path.of(
-                path,
-                project.getUser().getUserId().toString(),
-                project.getProjectId().toString()).toString();
-
-        File projectDirectory = new File(projectPath);
-
-        if (projectDirectory.exists()){
-            deleteDirectory(projectDirectory);
-        }
-        deploymentRepository.deleteAll(project.getDeployments());
+        deploymentRepository.deleteAll(deployments);
         project.getDeployments().clear();
+
+        for (String imageName : imageNames) {
+            if (!deploymentRepository.existsByImageName(imageName)) {
+                dockerService.removeImage(imageName);
+            }
+        }
     }
 
     private void cloneRepository(

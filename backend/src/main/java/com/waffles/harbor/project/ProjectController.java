@@ -49,7 +49,7 @@ public class ProjectController {
                 .body(projectService.addRepositoryUrl(user, projectId, request.getRepositoryUrl()));
     }
 
-    @DeleteMapping("/projects/{projectId}/deployments")
+    @DeleteMapping("/{projectId}/deployments")
     public ResponseEntity<Void> deleteAllDeployments(
             @AuthenticationPrincipal User user,
             @PathVariable UUID projectId
