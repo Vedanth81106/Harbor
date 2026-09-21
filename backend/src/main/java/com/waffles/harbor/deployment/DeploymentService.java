@@ -7,10 +7,12 @@ import com.waffles.harbor.git.GitCommit;
 import com.waffles.harbor.git.GitService;
 import com.waffles.harbor.project.Project;
 import com.waffles.harbor.project.ProjectRepository;
+import com.waffles.harbor.sse.SseService;
 import com.waffles.harbor.user.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -28,6 +30,7 @@ public class DeploymentService {
     private final ProjectRepository projectRepository;
     private final GitService gitService;
     private final DockerService dockerService;
+    private final SseService sseService;
 
     public List<DeploymentResponse> getAllDeployments(User user, UUID projectId) {
 
@@ -37,6 +40,20 @@ public class DeploymentService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    public SseEmitter getDeploymentLogs(User user, UUID deploymentId){
+
+        Deployment deployment = deploymentRepository
+                .findByDeploymentIdAndProject_User(deploymentId, user)
+                .orElseThrow(DeploymentNotFoundException::new);
+
+        String containerId = deployment.getContainerId();
+
+        if (containerId == null) {
+            throw new IllegalStateException("Deployment does not have a container");
+        }
+        return sseService.streamContainerLogs(containerId);
     }
 
     public DeploymentResponse deploy(User user, UUID projectId) throws Exception {

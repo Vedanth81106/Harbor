@@ -6,19 +6,20 @@ import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.Ports;
+import com.waffles.harbor.sse.SseService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.File;
 import java.util.Collections;
 
 @Service
+@RequiredArgsConstructor
 public class DockerService {
 
     private final DockerClient dockerClient;
-
-    public DockerService(DockerClient dockerClient){
-        this.dockerClient = dockerClient;
-    }
+    private final SseService sseService;
 
     public void buildImage(String filePath, String imageTag) {
 
@@ -85,13 +86,6 @@ public class DockerService {
         } catch (NotFoundException e) {
             System.out.println("Image " + imageName + " does not exist.");
         }
-    }
-
-    public InspectContainerResponse inspectContainerResponse(String containerId) {
-
-        // Contains container metadata, state, networking, ports,
-        // environment, mounts, restart policy, command, exit code, and health.
-        return dockerClient.inspectContainerCmd(containerId).exec();
     }
 
     public int getExposedImagePort(String imageName){
