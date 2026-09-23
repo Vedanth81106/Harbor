@@ -83,10 +83,14 @@ public class DeploymentService {
             return toResponse(deployment);
 
         } catch (Exception e) {
-
+            deleteImagesAndContainers(deployment);
+            String filePath = getDeploymentDirectory(deployment);
+            File deploymentDirectory = new File(filePath);
+            if (deploymentDirectory.exists()) {
+                deleteDirectory(deploymentDirectory);
+            }
             deployment.setStatus(DeploymentStatus.FAILED);
             deploymentRepository.save(deployment);
-
             throw e;
         }
     }
@@ -151,6 +155,7 @@ public class DeploymentService {
         }
 
         gitService.cloneRepository(repositoryUrl, filePath);
+
     }
 
     private void buildDeploymentImage(
@@ -167,15 +172,12 @@ public class DeploymentService {
 
         deploymentRepository.save(deployment);
 
-        dockerService.buildImage(
-                filePath,
-                deployment.getImageName()
-        );
+        dockerService.buildImage(filePath, deployment.getImageName());
     }
 
     private String startDeploymentContainer(
             Deployment deployment
-    ) throws Exception {
+    ){
 
         int containerPort = dockerService.getExposedImagePort(deployment.getImageName());
         String containerId = dockerService.createContainer(
@@ -184,12 +186,18 @@ public class DeploymentService {
                 containerPort,
                 "harbor-" + deployment.getDeploymentId()
         );
-
-        dockerService.startContainer(containerId);
-
-        int assignedHostPort = dockerService.getDockerContainerPort(containerId, containerPort);
-        deployment.setAssignedHostPort(assignedHostPort);
+        deployment.setContainerId(containerId);
         deploymentRepository.save(deployment);
+
+        try {
+            dockerService.startContainer(containerId);
+
+            int assignedHostPort = dockerService.getDockerContainerPort(containerId, containerPort);
+            deployment.setAssignedHostPort(assignedHostPort);
+            deploymentRepository.save(deployment);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
 
         return containerId;
     }

@@ -5,6 +5,8 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,4 +60,18 @@ public class GitService {
         }
     }
 
+    private boolean validateRepoUrl(String repoUrl){
+        if(repoUrl.isBlank()){
+            throw new IllegalStateException("Repository URL cannot be blank!");
+        }
+        try{
+            URI uri = new URI(repoUrl);
+            String scheme = uri.getScheme(); // gets the part before colon(i.e: http://, ftp://)
+            if(!(scheme == null) || !scheme.equalsIgnoreCase("http") || !scheme.equalsIgnoreCase("https")) return false;
+        }catch (URISyntaxException uriSyntaxException){
+            System.out.println(uriSyntaxException);
+        }
+
+        return true;
+    }
 }
