@@ -16,7 +16,7 @@ import java.util.concurrent.Executors;
 @RequiredArgsConstructor
 public class SseService {
 
-    private final ExecutorService executorService = Executors.newCachedThreadPool();
+    private final ExecutorService executorService = Executors.newFixedThreadPool(10);
     private final DockerClient dockerClient;
 
     public SseEmitter streamContainerLogs(String containerId){
@@ -49,29 +49,17 @@ public class SseService {
                 }
             };
 
-            emitter.onCompletion(() -> {
-                try {
-                    callback.close();
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-
-            emitter.onTimeout(() -> {
-                try {
-                    callback.close();
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-
-            emitter.onError((Throwable throwable) -> {
+            Runnable cleanup = () -> {
                 try{
                     callback.close();
-                }catch (IOException e){
+                }catch(IOException e){
                     throw new RuntimeException(e);
                 }
-            });
+            };
+
+            emitter.onCompletion(cleanup);
+            emitter.onTimeout(cleanup);
+            emitter.onError(e -> cleanup.run());
 
             dockerClient.logContainerCmd(containerId)
                     .withStdOut(true)    // Include standard output

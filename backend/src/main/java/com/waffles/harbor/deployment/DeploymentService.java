@@ -154,7 +154,7 @@ public class DeploymentService {
             throw new IllegalStateException("Project does not have a repository configured");
         }
 
-        gitService.cloneRepository(repositoryUrl, filePath);
+        gitService.cloneRepository(repositoryUrl, filePath, 60);
 
     }
 

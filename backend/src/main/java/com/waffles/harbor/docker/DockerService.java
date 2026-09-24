@@ -6,6 +6,7 @@ import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.Ports;
+import com.github.dockerjava.api.model.RestartPolicy;
 import com.waffles.harbor.sse.SseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,8 @@ import java.util.Collections;
 @Service
 @RequiredArgsConstructor
 public class DockerService {
+
+    // TODO: isolate Docker API behind a restricted deployment worker/proxy -> another phase by itself.
 
     private final DockerClient dockerClient;
     private final SseService sseService;
@@ -39,10 +42,19 @@ public class DockerService {
         ExposedPort internalPort = new ExposedPort(containerPort);
         Ports portBindings = new Ports();
         portBindings.bind(internalPort, Ports.Binding.bindPort(hostPort));
+        HostConfig hostConfig = HostConfig.newHostConfig()
+                .withPidsLimit(100L)
+                .withMemory(512*1024*1024L) // max 512Mb RAM
+                .withCpuPeriod(100000L)
+                .withCpuQuota(50000L)// container can only use 0.5% of cpu within the specified timeframe(100000 microseconds) i.e. 50% of one core
+                .withPortBindings(portBindings)
+                .withRestartPolicy(RestartPolicy.noRestart());
+
+        // TODO: disk and network are not limited. make sure to take care of them in the future tho
 
         CreateContainerResponse containerResponse = dockerClient.createContainerCmd(imageTag)
                 .withName(containerName)
-                .withHostConfig(HostConfig.newHostConfig().withPortBindings(portBindings))
+                .withHostConfig(hostConfig)
                 .exec();
 
         return containerResponse.getId();
