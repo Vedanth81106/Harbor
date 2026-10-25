@@ -14,6 +14,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.File;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +24,6 @@ public class DockerService {
     // TODO: isolate Docker API behind a restricted deployment worker/proxy -> another phase by itself.
 
     private final DockerClient dockerClient;
-    private final SseService sseService;
 
     public void buildImage(String filePath, String imageTag) {
 
@@ -37,22 +38,22 @@ public class DockerService {
                 .awaitImageId();
     }
 
-    public String createContainer(String imageTag, int hostPort, int containerPort, String containerName){
+    public String createContainer(String imageTag,int containerPort, String containerName){
 
-        ExposedPort internalPort = new ExposedPort(containerPort);
-        Ports portBindings = new Ports();
-        portBindings.bind(internalPort, Ports.Binding.bindPort(hostPort));
         HostConfig hostConfig = HostConfig.newHostConfig()
+                .withNetworkMode("harbor-proxy")
                 .withPidsLimit(100L)
                 .withMemory(512*1024*1024L) // max 512Mb RAM
                 .withCpuPeriod(100000L)
                 .withCpuQuota(50000L)// container can only use 0.5% of cpu within the specified timeframe(100000 microseconds) i.e. 50% of one core
-                .withPortBindings(portBindings)
                 .withRestartPolicy(RestartPolicy.noRestart());
 
         // TODO: disk and network are not limited. make sure to take care of them in the future tho
 
+        Map<String, String> labels = createTraefikLabels(containerPort, containerName);
+
         CreateContainerResponse containerResponse = dockerClient.createContainerCmd(imageTag)
+                .withLabels(labels)
                 .withName(containerName)
                 .withHostConfig(hostConfig)
                 .exec();
@@ -114,15 +115,15 @@ public class DockerService {
         return ports[0].getPort();
     }
 
-    public int getDockerContainerPort(String containerId, int containerPort){
-
-        InspectContainerResponse containerResponse = dockerClient.inspectContainerCmd(containerId).exec();
-        Ports bindings = containerResponse.getNetworkSettings().getPorts();
-        if(bindings == null || bindings.getBindings() == null) throw new IllegalStateException("No bindings found for container");
-
-        Ports.Binding[] hostBinding = bindings.getBindings().get(ExposedPort.tcp(containerPort));
-        if(hostBinding == null || hostBinding.length == 0) throw new IllegalStateException("Could not find port binding!");
-
-        return Integer.parseInt(hostBinding[0].getHostPortSpec());
+    private static Map<String, String> createTraefikLabels(int containerPort, String containerName){
+        Map<String, String> labels = new HashMap<>();
+        labels.put("traefik.enable","true");
+        labels.put("traefik.docker.network","harbor-proxy");
+        labels.put("traefik.http.routers."+containerName+".entrypoints","web");
+        labels.put("traefik.http.routers."+containerName+".rule","Host(`"+containerName+".localhost`)");
+        labels.put("traefik.http.services."+containerName+".loadbalancer.server.port",String.valueOf(containerPort));
+        return labels;
     }
 }
+
+

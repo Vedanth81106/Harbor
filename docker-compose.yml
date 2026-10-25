@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PWD}
       POSTGRES_DB: ${DB_NAME}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432" # bound to the local machine
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
       interval: 5s
@@ -25,7 +25,8 @@ services:
       dockerfile: Dockerfile
     container_name: harbor_backend
     ports:
-      - "8080:8080"
+      - 8080:8080
+    # traefik will handle ports to serve backend
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${DB_NAME}
       SPRING_DATASOURCE_USERNAME: ${DB_USER}
@@ -37,13 +38,36 @@ services:
         condition: service_healthy
     networks:
       - harbor-network
+      - harbor-proxy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /home/vedanth/Harbor/tmp:/home/tmp/Harbor
+
+  traefik:
+    image: "traefik:v3.6"
+    container_name: "traefik"
+    command:
+      #- "--log.level=DEBUG"
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=harbor-proxy"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - "harbor-network"
+      - "harbor-proxy"
 
 volumes:
   harbor_db_data:
 
 networks:
   harbor-network:
+    name: harbor-network
+    driver: bridge
+  harbor-proxy:
+    name: harbor-proxy
     driver: bridge

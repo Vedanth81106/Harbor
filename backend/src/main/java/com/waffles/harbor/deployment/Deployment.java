@@ -28,8 +28,6 @@ public class Deployment {
 
     private String containerId;
 
-    private int assignedHostPort;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DeploymentStatus status;

@@ -180,9 +180,9 @@ public class DeploymentService {
     ){
 
         int containerPort = dockerService.getExposedImagePort(deployment.getImageName());
+
         String containerId = dockerService.createContainer(
                 deployment.getImageName(),
-                0,
                 containerPort,
                 "harbor-" + deployment.getDeploymentId()
         );
@@ -191,9 +191,6 @@ public class DeploymentService {
 
         try {
             dockerService.startContainer(containerId);
-
-            int assignedHostPort = dockerService.getDockerContainerPort(containerId, containerPort);
-            deployment.setAssignedHostPort(assignedHostPort);
             deploymentRepository.save(deployment);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -253,7 +250,6 @@ public class DeploymentService {
                 .status(deployment.getStatus())
                 .commitHash(deployment.getCommitHash())
                 .imageName(deployment.getImageName())
-                .hostPort(deployment.getAssignedHostPort())
                 .build();
     }
 

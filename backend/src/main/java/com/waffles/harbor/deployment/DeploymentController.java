@@ -15,7 +15,7 @@ import java.util.UUID;
 @RequestMapping("/deployments")
 @RequiredArgsConstructor
 public class DeploymentController {
-
+// TODO: handle non EXPOSE syntaxed Dockerfiles
     private final DeploymentService deploymentService;
 
     @GetMapping("/{projectId}")
