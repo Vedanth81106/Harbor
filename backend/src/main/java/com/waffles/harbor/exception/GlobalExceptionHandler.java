@@ -47,6 +47,11 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.NOT_FOUND,exception.getMessage());
     }
 
+    @ExceptionHandler(DeploymentStateException.class)
+    public ResponseEntity<ErrorResponse> handleDeploymentState(DeploymentStateException exception) {
+        return error(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
     @ExceptionHandler(UsernameAlreadyExistsException.class)
     public ResponseEntity<ErrorResponse> handleUsernameAlreadyExists(UsernameAlreadyExistsException exception) {
         return error(HttpStatus.CONFLICT,exception.getMessage());

@@ -99,6 +99,15 @@ public class GitService {
             InetAddress[] addresses = InetAddress.getAllByName(host);
 
             for(InetAddress address : addresses){
+                log.info(
+                        "Resolved address: {}, anyLocal={}, siteLocal={}, loopback={}, linkLocal={}, multicast={}",
+                        address.getHostAddress(),
+                        address.isAnyLocalAddress(),
+                        address.isSiteLocalAddress(),
+                        address.isLoopbackAddress(),
+                        address.isLinkLocalAddress(),
+                        address.isMulticastAddress()
+                );
                 if(address.isAnyLocalAddress() || address.isSiteLocalAddress() ||
                         address.isLoopbackAddress() || address.isLinkLocalAddress() || address.isMulticastAddress()) return false;
             }

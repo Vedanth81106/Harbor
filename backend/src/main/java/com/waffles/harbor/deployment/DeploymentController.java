@@ -2,6 +2,7 @@ package com.waffles.harbor.deployment;
 
 import com.waffles.harbor.user.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,10 +16,10 @@ import java.util.UUID;
 @RequestMapping("/deployments")
 @RequiredArgsConstructor
 public class DeploymentController {
-// TODO: handle non EXPOSE syntaxed Dockerfiles
+// TODO: handle non "EXPOSE" syntaxed Dockerfiles
     private final DeploymentService deploymentService;
 
-    @GetMapping("/{projectId}")
+    @GetMapping("/project/{projectId}")
     public ResponseEntity<List<DeploymentResponse>> getAllDeployments(
             @AuthenticationPrincipal User user,
             @PathVariable UUID projectId
@@ -26,6 +27,14 @@ public class DeploymentController {
         return ResponseEntity.ok(
                 deploymentService.getAllDeployments(user, projectId)
         );
+    }
+
+    @GetMapping("/{deploymentId}")
+    public ResponseEntity<DeploymentResponse> getDeployment(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID deploymentId
+    ) {
+        return ResponseEntity.ok(deploymentService.getDeployment(user, deploymentId));
     }
 
     @GetMapping(
@@ -39,14 +48,21 @@ public class DeploymentController {
         return deploymentService.getDeploymentLogs(user,deploymentId);
     }
 
-    @PostMapping("/deploy/{projectId}")
-    public ResponseEntity<DeploymentResponse> deploy(
+    @PostMapping("/{projectId}")
+    public ResponseEntity<DeploymentResponse> createDeployment(
             @AuthenticationPrincipal User user,
             @PathVariable UUID projectId
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(deploymentService.createDeployment(user, projectId));
+    }
+
+    @PostMapping("/{deploymentId}/execute")
+    public ResponseEntity<DeploymentResponse> executeDeployment(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID deploymentId
     ) throws Exception {
-        return ResponseEntity.ok(
-                deploymentService.deploy(user, projectId)
-        );
+        return ResponseEntity.ok(deploymentService.executeDeployment(user, deploymentId));
     }
 
     @DeleteMapping("/{deploymentId}")

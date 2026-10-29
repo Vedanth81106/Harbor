@@ -149,6 +149,13 @@
 			<version>7.7.1.202607240634-r</version>
 			<scope>compile</scope>
 		</dependency>
+		<!--spring boot hot reloading -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<scope>runtime</scope>
+			<optional>true</optional>
+		</dependency>
 	</dependencies>
 
 	<build>
