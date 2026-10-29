@@ -6,7 +6,6 @@ public enum DeploymentStatus {
     CLONING,
     BUILDING,
     STARTING,
-    RUNNING,
     FAILED,
     READY,
     STOPPED

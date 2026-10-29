@@ -91,7 +91,6 @@ public class DockerService {
     public void startContainer(String containerId, UUID deploymentId) {
         String networkName = getNetworkName(deploymentId);
 
-        // Fail rather than silently creating a deployment without routing.
         String traefikId = dockerClient
                 .inspectContainerCmd(TRAEFIK_CONTAINER)
                 .exec()
@@ -195,6 +194,48 @@ public class DockerService {
         }
 
         removeNetworkIfPresent(networkName);
+    }
+
+    // this method is used for reconnecting traefik to existing deployment containers after a docker restart
+    public void reconnectTraefik(UUID deploymentId, String containerId){
+        String networkName = getNetworkName(deploymentId);
+
+        try{
+            InspectContainerResponse app = dockerClient
+                    .inspectContainerCmd(containerId)
+                    .exec();
+
+            if (!Boolean.TRUE.equals(app.getState().getRunning())) {
+                log.warn(
+                        "Skipping routing recovery: container {} is not running",
+                        containerId
+                );
+                return;
+            }
+            // verify deployment network exists
+            dockerClient.inspectNetworkCmd()
+                    .withNetworkId(networkName).exec();
+
+            // verify traefik container exists
+            String traefikId = dockerClient.inspectContainerCmd(TRAEFIK_CONTAINER)
+                    .exec().getId();
+
+            boolean isAlreadyConnected = dockerClient.inspectNetworkCmd()
+                    .withNetworkId(networkName).exec()
+                    .getContainers().containsKey(traefikId);
+
+            if(!isAlreadyConnected){
+                dockerClient.connectToNetworkCmd()
+                        .withNetworkId(networkName)
+                        .withContainerId(traefikId).exec();
+            }
+        }catch(NotFoundException e){
+            log.warn(
+                    "Cannot restore routing for deployment {}: " +
+                            "container or network not found",
+                    deploymentId
+            );
+        }
     }
 
     private void createIsolatedNetwork(String networkName) {

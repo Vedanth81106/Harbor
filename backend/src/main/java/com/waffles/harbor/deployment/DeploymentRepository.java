@@ -13,6 +13,6 @@ public interface DeploymentRepository extends JpaRepository<Deployment, UUID> {
 
     // if any deployment exists that has image name and any deployment with deployment id OTHER than give one
     boolean existsByImageNameAndDeploymentIdNot(String imageName, UUID deploymentId);
-
+    List<Deployment> findByStatus(DeploymentStatus status);
     boolean existsByImageName(String imageName);
 }
