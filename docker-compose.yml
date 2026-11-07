@@ -49,12 +49,20 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=harbor-proxy"
       - "--entrypoints.web.address=:80"
-    ports:
-      - "80:80"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     networks:
       - "harbor-proxy"
+
+  cloudflared:
+    image: "cloudflare/cloudflared:latest"
+    container_name: "harbor-cloudflare"
+    restart: unless-stopped
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TOKEN}
+    command: tunnel --no-autoupdate run
+    networks:
+      - harbor-proxy #since traefik is already on this network, we will put cf on the same network so that they can talk to each other
 
 volumes:
   harbor_db_data:
