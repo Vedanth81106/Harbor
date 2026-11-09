@@ -12,6 +12,7 @@ import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.RestartPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -27,6 +28,8 @@ public class DockerService {
 
     // TODO: Isolate Docker API access behind a restricted deployment worker/proxy.
 
+    @Value("${domain-name}")
+    private String domainName;
     private static final String TRAEFIK_CONTAINER = "traefik";
     private static final String NETWORK_PREFIX = "net-";
     private static final long MEMORY_LIMIT = 512L * 1024 * 1024;
@@ -35,7 +38,6 @@ public class DockerService {
     private static final long PID_LIMIT = 100L;
 
     private final DockerClient dockerClient;
-
     public void buildImage(String filePath, String imageTag) {
         File buildDirectory = new File(filePath);
         File dockerfile = new File(buildDirectory, "Dockerfile");
@@ -65,7 +67,7 @@ public class DockerService {
                     .withMemory(MEMORY_LIMIT)
                     .withCpuPeriod(CPU_PERIOD)
                     .withCpuQuota(CPU_QUOTA)
-                    .withRestartPolicy(RestartPolicy.noRestart());
+                    .withRestartPolicy(RestartPolicy.unlessStoppedRestart());
 
             Map<String, String> labels = createTraefikLabels(
                     networkName,
@@ -96,10 +98,18 @@ public class DockerService {
                 .exec()
                 .getId();
 
-        dockerClient.connectToNetworkCmd()
+        boolean isAlreadyConnected = dockerClient.inspectNetworkCmd()
                 .withNetworkId(networkName)
-                .withContainerId(traefikId)
-                .exec();
+                .exec()
+                .getContainers()
+                .containsKey(traefikId);
+
+        if (!isAlreadyConnected) {
+            dockerClient.connectToNetworkCmd()
+                    .withNetworkId(networkName)
+                    .withContainerId(traefikId)
+                    .exec();
+        }
 
         dockerClient.startContainerCmd(containerId).exec();
     }
@@ -123,6 +133,19 @@ public class DockerService {
             dockerClient.removeContainerCmd(containerId).exec();
         } catch (NotFoundException e) {
             log.debug("Container {} is already absent.", containerId);
+        }
+    }
+
+    public void recoverContainer(UUID deploymentId, String containerId){
+        try{
+            InspectContainerResponse info = dockerClient
+                    .inspectContainerCmd(containerId)
+                    .exec();
+            if(!Boolean.TRUE.equals(info.getState().getRunning())) {
+                startContainer(containerId, deploymentId);
+            } else reconnectTraefik(deploymentId, containerId);
+        }catch (com.github.dockerjava.api.exception.NotFoundException e) {
+            log.debug("Container with container id: " + containerId + "does not exist!");
         }
     }
 
@@ -279,7 +302,7 @@ public class DockerService {
         );
         labels.put(
                 "traefik.http.routers." + containerName + ".rule",
-                "Host(`" + containerName + ".localhost`)"
+                "Host(`" + containerName + "." + domainName+"`)"
         );
         labels.put(
                 "traefik.http.services." + containerName

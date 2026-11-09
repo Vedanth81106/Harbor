@@ -30,6 +30,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${DB_USER}
       SPRING_DATASOURCE_PASSWORD: ${DB_PWD}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      DOMAIN_NAME: ${DOMAIN}
       CONFIG_PATH: /home/vedanth/Harbor/tmp
     depends_on:
       db:

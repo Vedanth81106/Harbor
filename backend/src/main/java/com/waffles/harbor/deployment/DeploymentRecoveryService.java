@@ -23,7 +23,7 @@ public class DeploymentRecoveryService {
 
         for (Deployment deployment : deployments) {
             try {
-                dockerService.reconnectTraefik(
+                dockerService.recoverContainer(
                         deployment.getDeploymentId(),
                         deployment.getContainerId()
                 );
