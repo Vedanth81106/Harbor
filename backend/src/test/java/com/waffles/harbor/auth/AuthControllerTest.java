@@ -3,6 +3,7 @@ package com.waffles.harbor.auth;
 import com.waffles.harbor.auth.dto.AuthResponse;
 import com.waffles.harbor.auth.dto.LoginRequest;
 import com.waffles.harbor.auth.dto.RegisterRequest;
+import com.waffles.harbor.exception.UsernameAlreadyExistsException;
 import com.waffles.harbor.security.JwtAuthenticationFilter;
 import com.waffles.harbor.security.JwtService;
 import com.waffles.harbor.security.SecurityConfig;
@@ -136,7 +137,7 @@ class AuthControllerTest {
     void shouldRejectRegistrationWhenUsernameAlreadyExists() throws Exception {
 
         when(authService.register(any(RegisterRequest.class)))
-                .thenThrow(new IllegalArgumentException("Username is already taken!"));
+                .thenThrow(new UsernameAlreadyExistsException());
 
         mockMvc.perform(
                         post("/auth/register")
@@ -149,7 +150,7 @@ class AuthControllerTest {
                             }
                             """)
                 )
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict());
     }
 
     @Test

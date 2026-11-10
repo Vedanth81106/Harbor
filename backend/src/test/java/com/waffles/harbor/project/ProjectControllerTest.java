@@ -1,6 +1,7 @@
 package com.waffles.harbor.project;
 
 import com.waffles.harbor.auth.Role;
+import com.waffles.harbor.deployment.DeploymentService;
 import com.waffles.harbor.exception.ProjectNotFoundException;
 import com.waffles.harbor.security.JwtService;
 import com.waffles.harbor.user.User;
@@ -59,6 +60,9 @@ class ProjectControllerTest {
 
     @MockitoBean
     private ProjectService projectService;
+
+    @MockitoBean
+    private DeploymentService deploymentService;
 
     @Test
     void shouldGetAllProjects() throws Exception {
@@ -170,7 +174,7 @@ class ProjectControllerTest {
         UUID projectId = UUID.randomUUID();
 
         when(projectService.getProjectByProjectId(user,projectId))
-                .thenThrow(new IllegalArgumentException("Project not found!"));
+                .thenThrow(new ProjectNotFoundException());
 
         mockMvc.perform(
                         get("/projects/"+projectId)
@@ -182,7 +186,7 @@ class ProjectControllerTest {
                                         )
                                 ))
                 )
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isNotFound());
 
         verify(projectService).getProjectByProjectId(user,projectId);
     }
