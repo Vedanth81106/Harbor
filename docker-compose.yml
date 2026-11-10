@@ -31,7 +31,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${DB_PWD}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       DOMAIN_NAME: ${DOMAIN}
-      CONFIG_PATH: /home/vedanth/Harbor/tmp
+      CONFIG_PATH: /harbor-workspace
     depends_on:
       db:
         condition: service_healthy
@@ -39,7 +39,7 @@ services:
       - harbor-network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /home/vedanth/Harbor/tmp:/home/tmp/Harbor
+      - ${HARBOR_WORKSPACE:-./tmp}:/harbor-workspace
 
   traefik:
     image: "traefik:v3.6"

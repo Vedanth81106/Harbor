@@ -349,4 +349,52 @@ class ProjectControllerTest {
                 "https://github.com/Vedanth81106/docs.git"
         );
     }
+
+    @Test
+    void shouldDeleteAllDeploymentsForProject() throws Exception {
+
+        User user = createUser("happy");
+        UUID projectId = UUID.randomUUID();
+
+        mockMvc.perform(
+                        delete("/projects/" + projectId + "/deployments")
+                                .with(csrf())
+                                .with(authentication(
+                                        new UsernamePasswordAuthenticationToken(
+                                                user,
+                                                null,
+                                                user.getAuthorities()
+                                        )
+                                ))
+                )
+                .andExpect(status().isNoContent());
+
+        verify(deploymentService).deleteAllDeploymentsForProject(user, projectId);
+    }
+
+    @Test
+    void shouldRejectDeletingDeploymentsWhenProjectDoesNotExist() throws Exception {
+
+        User user = createUser("sad");
+        UUID projectId = UUID.randomUUID();
+
+        doThrow(new ProjectNotFoundException())
+                .when(deploymentService)
+                .deleteAllDeploymentsForProject(user, projectId);
+
+        mockMvc.perform(
+                        delete("/projects/" + projectId + "/deployments")
+                                .with(csrf())
+                                .with(authentication(
+                                        new UsernamePasswordAuthenticationToken(
+                                                user,
+                                                null,
+                                                user.getAuthorities()
+                                        )
+                                ))
+                )
+                .andExpect(status().isNotFound());
+
+        verify(deploymentService).deleteAllDeploymentsForProject(user, projectId);
+    }
 }

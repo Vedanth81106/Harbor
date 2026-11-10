@@ -8,9 +8,11 @@ The repository currently contains the backend and its deployment infrastructure;
 
 ## Agent rules
 
-- **Never create Git commits.** Do not run `git commit`, `git commit --amend`, `git rebase`, `git merge`, `git tag`, or any command that rewrites history. Leave every change uncommitted in the working tree so the repository owner can review and commit it.
+- **Never create Git commits.** Do not run `git commit`, `git commit --amend`, `git rebase`, `git merge`, `git tag`, or any other command that creates a commit or rewrites history. Leave every change in the working tree, uncommitted, so the repository owner can review the diff.
+- **Report changes instead of committing them.** At the end of every task, list the files changed, summarize what changed and why, and call out anything the owner should verify. The repository owner commits manually.
 - Do not push, publish, or create releases. The repository owner is the only intended GitHub collaborator, so no agent may add commits under its own identity.
 - Do not change Git author/committer configuration or bypass hooks.
+- Read-only Git commands such as `git status`, `git diff`, `git log`, and `git show` are fine.
 
 ## Repository layout
 
@@ -34,8 +36,8 @@ The repository currently contains the backend and its deployment infrastructure;
 - Java 25 and Spring Boot 4.1.0; the Maven wrapper is in `backend/`.
 - PostgreSQL is the application database (`spring.jpa.hibernate.ddl-auto=update`). Docker and the Docker socket are used by the deployment engine.
 - The backend reads `JWT_SECRET_KEY`, `CONFIG_PATH`, and `DOMAIN_NAME` from the environment (see `backend/src/main/resources/application.properties`).
-- Compose currently expects `DB_USER`, `DB_PWD`, `DB_NAME`, `JWT_SECRET_KEY`, `DOMAIN`, and `CLOUDFLARE_TOKEN`. Note that `.env.example` is stale (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`); use the names Compose actually references. Do not commit `.env`, credentials, or deployment secrets.
-- Compose mounts the host Docker socket and an absolute workspace path (`/home/vedanth/Harbor/tmp` in `docker-compose.yml`). Update these paths per machine and keep `CONFIG_PATH` consistent with the mounted directory.
+- Compose expects `DB_USER`, `DB_PWD`, `DB_NAME`, `JWT_SECRET_KEY`, `DOMAIN`, `CLOUDFLARE_TOKEN`, and `HARBOR_WORKSPACE`. Keep `.env.example` in sync with the variables Compose references. Do not commit `.env`, credentials, or deployment secrets.
+- Compose mounts the host Docker socket and mounts the host directory from `HARBOR_WORKSPACE` (default `./tmp`) at `/harbor-workspace` inside the backend container. The backend's `CONFIG_PATH` is set to `/harbor-workspace`; do not hard-code machine-specific host paths in tracked files.
 - Start the stack from the repository root with `docker compose up --build` after configuring `.env`.
 - Build the backend directly from `backend/` with `./mvnw clean package`; run it with `./mvnw spring-boot:run` only after providing the required environment variables.
 - Run backend tests from `backend/` with `./mvnw test` (Windows: `mvnw.cmd test`). Tests that use Testcontainers need Docker available.
