@@ -51,8 +51,8 @@ export function DriftingAnchor() {
       <div className="drift-bob relative">
         <span className="absolute bottom-full left-1/2 h-24 w-px -translate-x-1/2 bg-[linear-gradient(to_top,var(--muted),transparent)]" />
         <svg
-          width="30"
-          height="36"
+          width="50"
+          height="50"
           viewBox="0 0 32 38"
           fill="none"
           stroke="var(--muted)"

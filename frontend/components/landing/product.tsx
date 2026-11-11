@@ -1,4 +1,4 @@
-import { DeployPanel } from "@/components/deploy-panel";
+import { DeployPanel } from "@/components/landing/deploy-panel";
 
 const points = [
   {
@@ -26,7 +26,7 @@ export function Product() {
 
           <h2 className="reveal mt-6 max-w-[15ch] text-balance font-serif text-[clamp(2.6rem,5vw,3.9rem)] leading-[1.02] tracking-[-0.015em] text-fg">
             Everything between your code and{" "}
-            <em className="italic text-accent-soft">your users.</em>
+            <span className="text-accent-soft">your users.</span>
           </h2>
 
           <p className="reveal mt-6 max-w-[38ch] text-pretty text-[16.5px] leading-relaxed text-muted">

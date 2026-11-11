@@ -29,9 +29,7 @@ export function HowItWorks() {
 
         <div className="reveal mt-6 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <h2 className="max-w-[19ch] text-balance font-serif text-[clamp(2.6rem,5.4vw,4.2rem)] leading-[1.02] tracking-[-0.015em] text-fg">
-            From repository to live address,{" "}
-            <em className="italic text-accent-soft">in three steps.</em>
-          </h2>
+            From repository to live address.          </h2>
           <p className="max-w-sm text-pretty text-[16.5px] leading-relaxed text-muted lg:pb-2">
             Nothing to configure. Point Harbor at your code, press deploy, and
             open the link it hands back.
@@ -48,7 +46,7 @@ export function HowItWorks() {
               <span className="font-mono text-[11px] tracking-[0.18em] text-secondary">
                 {step.number}
               </span>
-              <h3 className="mt-4 font-display text-[19px] font-medium tracking-[-0.01em] text-fg">
+              <h3 className="mt-4 font-display text-[19px] font-medium tracking-[-0.01em] text-accent-soft">
                 {step.title}
               </h3>
               <p className="mt-2 text-[15px] leading-relaxed text-muted">

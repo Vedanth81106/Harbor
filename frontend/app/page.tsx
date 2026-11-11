@@ -1,7 +1,7 @@
-import { ClosingCta } from "@/components/closing-cta";
-import { Hero } from "@/components/hero";
-import { HowItWorks } from "@/components/how-it-works";
-import { Product } from "@/components/product";
+import { ClosingCta } from "@/components/landing/closing-cta";
+import { Hero } from "@/components/landing/hero";
+import { HowItWorks } from "@/components/landing/how-it-works";
+import { Product } from "@/components/landing/product";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 
@@ -13,7 +13,6 @@ export default function Home() {
         <Hero />
         <Product />
         <HowItWorks />
-        <ClosingCta />
       </main>
       <SiteFooter />
     </div>

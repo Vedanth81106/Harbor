@@ -17,7 +17,7 @@ export function ClosingCta() {
 
         <h2 className="reveal mt-6 text-balance font-serif text-[clamp(2.8rem,6.4vw,4.8rem)] leading-[0.98] tracking-[-0.02em] text-fg">
           Your next deploy is{" "}
-          <em className="italic text-accent-soft">a click away.</em>
+          <span className="text-accent-soft">a click away.</span>
         </h2>
 
         <p className="reveal mx-auto mt-7 max-w-[34rem] text-pretty text-[17px] leading-relaxed text-muted">

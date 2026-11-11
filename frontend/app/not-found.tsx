@@ -22,7 +22,7 @@ export default function NotFound() {
         </p>
 
         <h1 className="mt-6 text-balance font-serif text-[clamp(3rem,8vw,5.5rem)] leading-[0.98] tracking-[-0.02em] text-fg">
-          Lost at <em className="italic text-accent-soft">sea.</em>
+          Lost at <span className="text-accent-soft">sea.</span>
         </h1>
 
         <p className="mt-6 max-w-md text-pretty text-[17px] leading-relaxed text-muted">

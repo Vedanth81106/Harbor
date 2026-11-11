@@ -3,7 +3,6 @@ import "@fontsource-variable/inter";
 import "@fontsource-variable/space-grotesk";
 import "@fontsource-variable/jetbrains-mono";
 import "@fontsource/instrument-serif/400.css";
-import "@fontsource/instrument-serif/400-italic.css";
 import { ScrollFx } from "@/components/scroll-fx";
 import { DriftingAnchor } from "@/components/drifting-anchor";
 import "./globals.css";
@@ -15,7 +14,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
   ),
-  title: "Harbor — Push your code. Get a URL.",
+  title: "Harbor",
   description,
   applicationName: "Harbor",
   openGraph: {
