@@ -1,6 +1,11 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/components/auth/auth-provider";
 
 export function ClosingCta() {
+  const { openSignup } = useAuth();
+
   return (
     <section className="relative isolate overflow-hidden border-t border-line bg-bg">
       <div
@@ -11,11 +16,11 @@ export function ClosingCta() {
       </div>
 
       <div className="mx-auto w-full max-w-3xl px-6 pb-28 pt-28 text-center sm:pb-36 sm:pt-36">
-        <p className="reveal font-mono text-[11px] uppercase tracking-[0.18em] text-secondary">
+        <p className="reveal text-[11px] uppercase tracking-[0.18em] text-secondary">
           Start shipping
         </p>
 
-        <h2 className="reveal mt-6 text-balance font-serif text-[clamp(2.8rem,6.4vw,4.8rem)] leading-[0.98] tracking-[-0.02em] text-fg">
+        <h2 className="reveal mt-6 text-balance text-[clamp(2.8rem,6.4vw,4.8rem)] leading-[0.98] tracking-[-0.02em] text-fg">
           Your next deploy is{" "}
           <span className="text-accent-soft">a click away.</span>
         </h2>
@@ -26,7 +31,7 @@ export function ClosingCta() {
         </p>
 
         <div className="reveal mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button href="#signup" size="lg" className="w-full sm:w-auto">
+          <Button size="lg" className="w-full sm:w-auto" onClick={openSignup}>
             Create an account
           </Button>
           <Button
@@ -39,7 +44,7 @@ export function ClosingCta() {
           </Button>
         </div>
 
-        <p className="reveal mt-12 font-mono text-[10.5px] uppercase tracking-[0.2em] text-muted/80">
+        <p className="reveal mt-12 text-[10.5px] uppercase tracking-[0.2em] text-muted/80">
           No servers · No pipelines · No YAML
         </p>
       </div>

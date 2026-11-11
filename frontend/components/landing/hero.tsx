@@ -1,13 +1,18 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { HarborScene } from "@/components/harbor-scene";
+import { useAuth } from "@/components/auth/auth-provider";
 
 export function Hero() {
+  const { openSignup } = useAuth();
+
   return (
     <section className="relative isolate flex min-h-[calc(100svh-80px)] items-center overflow-hidden">
       <HarborScene />
 
       <div className="mx-auto w-full max-w-4xl px-6 pb-32 pt-20 text-center sm:pt-24">
-        <h1 className="rise font-display text-[clamp(3.25rem,8.4vw,6.5rem)] font-medium leading-[0.92] tracking-[-0.045em] text-fg">
+        <h1 className="rise text-[clamp(3.25rem,8.4vw,6.5rem)] font-medium leading-[0.92] tracking-[-0.045em] text-fg">
           <span className="block">Push your code.</span>
           <span className="block text-accent-soft">Get a URL.</span>
         </h1>
@@ -18,7 +23,7 @@ export function Hero() {
         </p>
 
         <div className="rise mt-10 flex flex-col items-center justify-center gap-3 [animation-delay:300ms] sm:flex-row">
-          <Button href="#signup" size="lg" className="w-full sm:w-auto">
+          <Button size="lg" className="w-full sm:w-auto" onClick={openSignup}>
             Create an account
           </Button>
           <Button

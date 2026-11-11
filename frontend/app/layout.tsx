@@ -1,10 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/inter";
-import "@fontsource-variable/space-grotesk";
-import "@fontsource-variable/jetbrains-mono";
-import "@fontsource/instrument-serif/400.css";
 import { ScrollFx } from "@/components/scroll-fx";
 import { DriftingAnchor } from "@/components/drifting-anchor";
+import { AuthProvider } from "@/components/auth/auth-provider";
 import "./globals.css";
 
 const description =
@@ -54,9 +52,11 @@ export default function RootLayout({
           Skip to content
         </a>
         <script dangerouslySetInnerHTML={{ __html: bootScript }} />
-        {children}
-        <ScrollFx />
-        <DriftingAnchor />
+        <AuthProvider>
+          {children}
+          <ScrollFx />
+          <DriftingAnchor />
+        </AuthProvider>
       </body>
     </html>
   );
