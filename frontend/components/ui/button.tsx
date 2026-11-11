@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-type Variant = "primary" | "secondary";
+type Variant = "primary" | "secondary" | "ghost";
 type Size = "md" | "lg";
 
 const base =
@@ -11,6 +11,8 @@ const variants: Record<Variant, string> = {
     "bg-accent text-on-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] hover:bg-accent-hover",
   secondary:
     "border border-secondary-border bg-secondary-wash text-secondary hover:border-secondary hover:bg-secondary-wash-hover hover:text-secondary-hover-fg",
+  ghost:
+    "border border-line bg-transparent text-fg hover:border-line-strong hover:bg-panel-2",
 };
 
 const sizes: Record<Size, string> = {

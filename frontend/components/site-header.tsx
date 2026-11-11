@@ -30,15 +30,12 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-1.5 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <ThemeToggle />
-          <Link
-            href="#login"
-            className="whitespace-nowrap px-1 py-2 text-[15px] text-muted transition-colors hover:text-secondary sm:px-2"
-          >
+          <Button href="/login" variant="ghost">
             Log in
-          </Link>
-          <Button href="#signup">Sign up</Button>
+          </Button>
+          <Button href="/signup">Sign up</Button>
         </div>
       </div>
     </header>
