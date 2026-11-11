@@ -12,12 +12,13 @@ const links = [
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-veil backdrop-blur-md">
-      <div className="grid h-[80px] w-full grid-cols-[1fr_auto_1fr] items-center gap-2 px-5 sm:px-8">
-        <div className="justify-self-start">
+      <div className="relative flex h-[80px] w-full items-center justify-between gap-2 px-4 sm:px-8">
+        <div className="flex items-center">
           <Logo />
         </div>
 
-        <nav className="hidden items-center gap-9 justify-self-center md:flex">
+        {/* absolutely centred so it stays on the viewport axis whatever flanks it */}
+        <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-9 lg:flex">
           {links.map((link) => (
             <Link
               key={link.label}
@@ -29,7 +30,7 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2 justify-self-end sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           <ThemeToggle />
           <Link
             href="#login"

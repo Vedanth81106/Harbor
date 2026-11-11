@@ -20,7 +20,7 @@ export function HowItWorks() {
   return (
     <section
       id="how-it-works"
-      className="relative scroll-mt-24 border-t border-line bg-bg text-fg"
+      className="relative scroll-mt-24 bg-panel text-fg"
     >
       <div className="mx-auto w-full max-w-6xl px-6 pb-24 pt-24 sm:pb-32 sm:pt-32">
         <p className="reveal font-mono text-[11px] uppercase tracking-[0.18em] text-secondary">
@@ -28,11 +28,11 @@ export function HowItWorks() {
         </p>
 
         <div className="reveal mt-6 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-          <h2 className="max-w-[19ch] font-serif text-[clamp(2.6rem,5.4vw,4.2rem)] leading-[1.02] tracking-[-0.015em] text-fg">
+          <h2 className="max-w-[19ch] text-balance font-serif text-[clamp(2.6rem,5.4vw,4.2rem)] leading-[1.02] tracking-[-0.015em] text-fg">
             From repository to live address,{" "}
             <em className="italic text-accent-soft">in three steps.</em>
           </h2>
-          <p className="max-w-sm text-[16.5px] leading-relaxed text-muted lg:pb-2">
+          <p className="max-w-sm text-pretty text-[16.5px] leading-relaxed text-muted lg:pb-2">
             Nothing to configure. Point Harbor at your code, press deploy, and
             open the link it hands back.
           </p>

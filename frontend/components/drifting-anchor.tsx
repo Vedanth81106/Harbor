@@ -21,7 +21,7 @@ export function DriftingAnchor() {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       const p = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
 
-      const travel = window.innerHeight * 0.6;
+      const travel = Math.max(0, window.innerHeight - 180);
 
       el.style.transform = `translate3d(0, ${p * travel}px, 0)`;
       el.style.opacity = String(Math.min(0.55, p * 5));
