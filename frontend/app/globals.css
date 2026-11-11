@@ -1,33 +1,131 @@
 @import "tailwindcss";
 
 /* ============================================================
-   Tokens — straight from design-ideas/color-palette.png
-   #07101B ink      #0D2944 deep    #12506F steel
-   #0B6B81 teal     #B1B9C5 mist    #800B1F crimson
-   ============================================================ */
-@theme {
-  --color-ink: #07101b;
-  --color-ink-soft: #08141f;
-  --color-deep: #0d2944;
-  --color-steel: #12506f;
-  --color-teal: #0b6b81;
-  --color-teal-lift: #1297b5;
-  --color-mist: #b1b9c5;
-  --color-crimson: #800b1f;
-  --color-crimson-lift: #c22b45;
-  --color-crimson-deep: #a81430;
+   Palette — design-ideas/color-palette.png
+   #07101B ink    #0D2944 deep   #12506F steel
+   #0B6B81 teal   #B1B9C5 mist   #800B1F crimson
 
-  /* light surfaces, derived from mist */
-  --color-paper: #eff2f5;
-  --color-paper-2: #e4e9ee;
-  --color-ink-muted: #4a5a6a;
-}
+   Components never touch the raw palette. They use the semantic
+   tokens below, which flip with [data-theme].
+   ============================================================ */
 
 @theme inline {
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Space Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-bg: var(--bg);
+  --color-veil: var(--veil);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-border: var(--secondary-border);
+  --color-secondary-wash: var(--secondary-wash);
+  --color-secondary-wash-hover: var(--secondary-wash-hover);
+  --color-secondary-hover-fg: var(--secondary-hover-fg);
+}
+
+:root {
+  color-scheme: dark;
+
+  --bg: #07101b;
+  --veil: rgba(7, 16, 27, 0.72);
+  --fg: #ffffff;
+  --muted: #9aa6b5;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  --accent: #800b1f;
+  --accent-hover: #a81430;
+  --accent-soft: #c22b45;
+  --on-accent: #ffffff;
+
+  --secondary: #1297b5;
+  --secondary-border: rgba(18, 151, 181, 0.45);
+  --secondary-wash: rgba(11, 107, 129, 0.1);
+  --secondary-wash-hover: rgba(11, 107, 129, 0.25);
+  --secondary-hover-fg: #ffffff;
+
+  /* the scene, at night */
+  --scene-sky-1: #07101b;
+  --scene-sky-2: #081623;
+  --scene-sky-3: #0b2234;
+  --scene-water-1: #0a1f2e;
+  --scene-water-2: #061120;
+  --scene-water-3: #07101b;
+  --scene-tint: rgba(18, 151, 181, 0.06);
+  --scene-horizon-a: rgba(18, 151, 181, 0.3);
+  --scene-horizon-b: rgba(18, 151, 181, 0.14);
+  --scene-horizon-c: rgba(194, 43, 69, 0.22);
+  --scene-glow: rgba(18, 151, 181, 0.1);
+  --scene-crest: rgba(177, 185, 197, 1);
+  --crest-mult: 1;
+  --scene-tower: #050d16;
+  --scene-tower-shade: rgba(0, 0, 0, 0.4);
+  --scene-tower-rim: rgba(177, 185, 197, 0.09);
+  --scene-band: rgba(13, 41, 68, 0.55);
+  --scene-lantern: #0a1a28;
+  --scene-lantern-line: rgba(177, 185, 197, 0.08);
+  --scene-porthole: rgba(18, 151, 181, 0.35);
+  --scene-lamp-core: #f6e3e7;
+  --scene-beam-opacity: 1;
+  --scene-reflect-opacity: 0.7;
+  --scene-grain: 0.03;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #eff2f5;
+  --veil: rgba(239, 242, 245, 0.78);
+  --fg: #07101b;
+  --muted: #4a5a6a;
+  --line: rgba(7, 16, 27, 0.12);
+  --line-strong: rgba(7, 16, 27, 0.2);
+
+  --accent: #800b1f;
+  --accent-hover: #6b0919;
+  --accent-soft: #800b1f;
+  --on-accent: #ffffff;
+
+  --secondary: #0b6b81;
+  --secondary-border: rgba(11, 107, 129, 0.55);
+  --secondary-wash: rgba(11, 107, 129, 0.09);
+  --secondary-wash-hover: rgba(11, 107, 129, 0.16);
+  --secondary-hover-fg: #07101b;
+
+  /* the scene, at dawn: deeper sky up top, pale at the horizon, darker water */
+  --scene-sky-1: #b9cfe2;
+  --scene-sky-2: #cfdfed;
+  --scene-sky-3: #e7edf4;
+  --scene-water-1: #b8cfe2;
+  --scene-water-2: #d5e3ee;
+  --scene-water-3: #eff2f5;
+  --scene-tint: rgba(11, 107, 129, 0.08);
+  --scene-horizon-a: rgba(11, 107, 129, 0.45);
+  --scene-horizon-b: rgba(11, 107, 129, 0.22);
+  --scene-horizon-c: rgba(128, 11, 31, 0.35);
+  --scene-glow: rgba(128, 11, 31, 0.12);
+  --scene-crest: rgba(13, 41, 68, 1);
+  --crest-mult: 1.8;
+  --scene-tower: #0d2944;
+  --scene-tower-shade: rgba(0, 0, 0, 0.32);
+  --scene-tower-rim: rgba(255, 255, 255, 0.3);
+  --scene-band: rgba(255, 255, 255, 0.2);
+  --scene-lantern: #123049;
+  --scene-lantern-line: rgba(255, 255, 255, 0.22);
+  --scene-porthole: rgba(11, 107, 129, 0.5);
+  --scene-lamp-core: #1d3c58;
+  --scene-grain: 0.02;
 }
 
 @layer base {
@@ -37,37 +135,103 @@
   }
 
   body {
-    background-color: var(--color-ink);
-    color: var(--color-mist);
+    background-color: var(--bg);
+    color: var(--fg);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
   ::selection {
-    background-color: var(--color-teal);
+    background-color: var(--secondary);
     color: #fff;
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-teal-lift);
+    outline: 2px solid var(--secondary);
     outline-offset: 3px;
     border-radius: 2px;
   }
+
+  /* only the big surfaces ease between themes */
+  body,
+  header,
+  section,
+  footer {
+    transition:
+      background-color 0.45s ease,
+      border-color 0.45s ease,
+      color 0.45s ease;
+  }
 }
 
-/* faint grain so the near-black never looks flat */
+/* faint grain so the flat surface never looks plastic */
 .grain::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 60;
   pointer-events: none;
-  opacity: 0.03;
+  opacity: var(--scene-grain);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* entrance motion: the page arriving, not performing */
+/* ---------- harbor scene ---------- */
+.scene-sky {
+  background-image: linear-gradient(
+    to bottom,
+    var(--scene-sky-1) 0%,
+    var(--scene-sky-2) 46%,
+    var(--scene-sky-3) 62.7%,
+    var(--scene-water-1) 63%,
+    var(--scene-water-2) 79%,
+    var(--scene-water-3) 100%
+  );
+}
+
+.scene-horizon {
+  background-image: linear-gradient(
+    to right,
+    transparent,
+    var(--scene-horizon-a) 30%,
+    var(--scene-horizon-b) 58%,
+    var(--scene-horizon-c) 88%,
+    transparent
+  );
+}
+
+.scene-horizon-glow {
+  background-image: radial-gradient(
+    58% 100% at 72% 100%,
+    var(--scene-glow),
+    transparent 78%
+  );
+}
+
+.scene-tint {
+  background-image: linear-gradient(to bottom, var(--scene-tint), transparent 45%);
+}
+
+.scene-crest {
+  background-image: linear-gradient(90deg, transparent, var(--scene-crest), transparent);
+}
+
+.scene-beam {
+  opacity: var(--scene-beam-opacity);
+}
+
+.scene-reflection {
+  opacity: var(--scene-reflect-opacity);
+}
+
+/* at dawn the lamp is out: tower stays, beam and reflection go */
+html[data-theme="light"] .scene-beam,
+html[data-theme="light"] .lamp-glow,
+html[data-theme="light"] .scene-reflection {
+  display: none;
+}
+
+/* ---------- entrance and scroll motion ---------- */
 @keyframes rise {
   from {
     opacity: 0;
@@ -97,6 +261,90 @@
   transform: none;
 }
 
+/* three motions, all slow enough to read as weather */
+@keyframes sweep {
+  from {
+    transform: rotate(-3.2deg);
+  }
+  to {
+    transform: rotate(3.2deg);
+  }
+}
+
+.beam-sweep {
+  transform-box: view-box;
+  transform-origin: 100px 90px;
+  animation: sweep 36s ease-in-out infinite alternate;
+}
+
+@keyframes tide {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(var(--tide-shift, 6px));
+  }
+}
+
+.tide {
+  animation: tide 34s ease-in-out infinite alternate;
+}
+
+@keyframes lamp {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+.lamp-glow {
+  animation: lamp 9s ease-in-out infinite;
+}
+
+/* ---------- theme toggle ---------- */
+.theme-to-dark {
+  display: none;
+}
+
+html[data-theme="light"] .theme-to-dark {
+  display: inline-flex;
+}
+
+html[data-theme="light"] .theme-to-light {
+  display: none;
+}
+
+/* ---------- logo ----------
+   Swapped here rather than in markup so only one file is fetched. */
+.logo-mark {
+  display: block;
+  width: 38px;
+  height: 44px;
+  background: url("/harbor-logo.svg") center / contain no-repeat;
+}
+
+html[data-theme="light"] .logo-mark {
+  background-image: url("/harbor-logo-light.svg");
+}
+
+/* ---------- drifting anchor ---------- */
+@keyframes drift-bob {
+  0%,
+  100% {
+    transform: translateY(-3px);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+.drift-bob {
+  animation: drift-bob 7s ease-in-out infinite;
+}
+
 /* lenis */
 html.lenis,
 html.lenis body {
@@ -123,6 +371,13 @@ html.lenis body {
   .js .reveal {
     opacity: 1;
     transform: none;
+  }
+
+  body,
+  header,
+  section,
+  footer {
+    transition: none;
   }
 
   *,

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 
 const links = [
@@ -10,26 +11,29 @@ const links = [
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-50 border-b border-teal-lift/15 bg-ink/70 backdrop-blur-md">
-      <div className="mx-auto flex h-[72px] w-full max-w-6xl items-center gap-8 px-6">
-        <Logo />
+    <header className="sticky top-0 z-50 border-b border-line bg-veil backdrop-blur-md">
+      <div className="grid h-[80px] w-full grid-cols-[1fr_auto_1fr] items-center gap-2 px-5 sm:px-8">
+        <div className="justify-self-start">
+          <Logo />
+        </div>
 
-        <nav className="ml-auto hidden items-center gap-7 md:flex">
+        <nav className="hidden items-center gap-9 justify-self-center md:flex">
           {links.map((link) => (
             <Link
               key={link.label}
               href={link.href}
-              className="text-[13.5px] text-mist/70 transition-colors hover:text-teal-lift"
+              className="text-[15px] text-muted transition-colors hover:text-secondary"
             >
               {link.label}
             </Link>
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2 md:ml-0">
+        <div className="flex items-center gap-2 justify-self-end sm:gap-3">
+          <ThemeToggle />
           <Link
             href="#login"
-            className="hidden px-3 py-2 text-[13.5px] text-mist/70 transition-colors hover:text-teal-lift sm:block"
+            className="whitespace-nowrap px-1 py-2 text-[15px] text-muted transition-colors hover:text-secondary sm:px-2"
           >
             Log in
           </Link>

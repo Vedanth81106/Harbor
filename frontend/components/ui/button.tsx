@@ -8,14 +8,14 @@ const base =
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-crimson text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] hover:bg-crimson-deep",
+    "bg-accent text-on-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] hover:bg-accent-hover",
   secondary:
-    "border border-teal-lift/45 bg-teal/[0.10] text-teal-lift hover:border-teal-lift hover:bg-teal/25 hover:text-white",
+    "border border-secondary-border bg-secondary-wash text-secondary hover:border-secondary hover:bg-secondary-wash-hover hover:text-secondary-hover-fg",
 };
 
 const sizes: Record<Size, string> = {
-  md: "px-5 py-2.5 text-sm",
-  lg: "px-7 py-3.5 text-[15px]",
+  md: "px-5 py-2.5 text-[15px]",
+  lg: "px-7 py-3.5 text-[15.5px]",
 };
 
 export function Button({
