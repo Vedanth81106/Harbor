@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/auth-provider";
 
 export function ClosingCta() {
-  const { openSignup } = useAuth();
+  const { openSignup, user } = useAuth();
 
   return (
     <section className="relative isolate overflow-hidden border-t border-line bg-bg">
@@ -31,9 +31,19 @@ export function ClosingCta() {
         </p>
 
         <div className="reveal mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button size="lg" className="w-full sm:w-auto" onClick={openSignup}>
-            Create an account
-          </Button>
+          {user ? (
+            <Button
+              href="/dashboard"
+              size="lg"
+              className="w-full sm:w-auto"
+            >
+              Open dashboard
+            </Button>
+          ) : (
+            <Button size="lg" className="w-full sm:w-auto" onClick={openSignup}>
+              Create an account
+            </Button>
+          )}
           <Button
             href="#how-it-works"
             variant="secondary"

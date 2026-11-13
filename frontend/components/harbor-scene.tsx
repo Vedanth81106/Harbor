@@ -26,6 +26,10 @@ export function HarborScene() {
       {/* sky and water: one continuous gradient, horizon sits at 63% */}
       <div className="scene-sky absolute inset-0" />
 
+      {/* celestial bodies: moon at night, sun at dawn */}
+      <div className="scene-moon absolute left-[12%] top-[14%] h-14 w-14 rounded-full sm:left-[16%] sm:top-[13%] sm:h-16 sm:w-16" />
+      <div className="scene-sun absolute right-[18%] top-[18%] h-16 w-16 rounded-full sm:right-[22%] sm:top-[16%] sm:h-20 sm:w-20" />
+
       {/* horizon: a hairline plus a soft bloom, cooler on the left, warmer under the light */}
       <div className="scene-horizon absolute inset-x-0 top-[63%] h-px" />
       <div className="scene-horizon-glow absolute inset-x-0 top-[calc(63%-3rem)] h-24 blur-lg" />

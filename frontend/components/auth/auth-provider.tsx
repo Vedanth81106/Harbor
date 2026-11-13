@@ -1,26 +1,69 @@
 "use client";
 
-import Link from "next/link";
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type FormEvent,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
+import {
+  ApiError,
+  login,
+  register,
+  type AuthResult,
+  type AuthUser,
+} from "@/lib/api";
 
 type AuthMode = "login" | "signup" | null;
 
 type AuthContextValue = {
   open: AuthMode;
-  openLogin: () => void;
+  openLogin: (nextPath?: string) => void;
   openSignup: () => void;
   close: () => void;
+  ready: boolean;
+  user: AuthUser | null;
+  accessToken: string | null;
+  setSession: (session: AuthResult) => void;
+  logout: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+const SESSION_KEY = "harbor.auth.session";
+
+const inputClass =
+  "mt-2 w-full rounded-xl border border-line bg-panel-2 px-4 py-3 text-[15px] text-fg placeholder:text-muted/70 outline-none transition-colors focus:border-secondary disabled:cursor-not-allowed disabled:opacity-60";
+
+function readStoredSession(): AuthResult | null {
+  try {
+    const raw = window.localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<AuthResult>;
+    if (
+      typeof parsed.accessToken !== "string" ||
+      typeof parsed.username !== "string" ||
+      typeof parsed.email !== "string"
+    ) {
+      return null;
+    }
+
+    return {
+      accessToken: parsed.accessToken,
+      username: parsed.username,
+      email: parsed.email,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
@@ -30,7 +73,23 @@ export function useAuth() {
   return ctx;
 }
 
-function AuthDialog({ mode, onClose }: { mode: Exclude<AuthMode, null>; onClose: () => void }) {
+function AuthDialog({
+  mode,
+  onClose,
+}: {
+  mode: Exclude<AuthMode, null>;
+  onClose: () => void;
+}) {
+  const { setSession } = useAuth();
+  const isLogin = mode === "login";
+
+  const [identifier, setIdentifier] = useState("");
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -44,7 +103,34 @@ function AuthDialog({ mode, onClose }: { mode: Exclude<AuthMode, null>; onClose:
     };
   }, [onClose]);
 
-  const isLogin = mode === "login";
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending) return;
+
+    setError(null);
+    setPending(true);
+
+    try {
+      const result = isLogin
+        ? await login({ identifier: identifier.trim(), password })
+        : await register({
+            username: username.trim(),
+            email: email.trim(),
+            password,
+          });
+
+      setSession(result);
+      onClose();
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Something went wrong. Please try again.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <div
@@ -88,36 +174,68 @@ function AuthDialog({ mode, onClose }: { mode: Exclude<AuthMode, null>; onClose:
               : "Connect a repository and get a live URL in minutes."}
           </p>
 
-          <form className="mt-8 space-y-5" action="#" method="post" onSubmit={(e) => e.preventDefault()}>
+          <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             {!isLogin && (
               <div>
-                <label htmlFor="auth-name" className="block text-[13px] font-medium text-fg">
-                  Name
+                <label htmlFor="auth-username" className="block text-[13px] font-medium text-fg">
+                  Username
                 </label>
                 <input
-                  id="auth-name"
-                  name="name"
+                  id="auth-username"
+                  name="username"
                   type="text"
-                  autoComplete="name"
-                  placeholder="Your name"
-                  className="mt-2 w-full rounded-xl border border-line bg-panel-2 px-4 py-3 text-[15px] text-fg placeholder:text-muted/70 outline-none transition-colors focus:border-secondary"
+                  autoComplete="username"
+                  placeholder="your-handle"
+                  minLength={3}
+                  maxLength={100}
+                  required
+                  disabled={pending}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className={inputClass}
                 />
+                <p className="mt-1.5 text-[12px] text-muted">At least 3 characters.</p>
               </div>
             )}
 
-            <div>
-              <label htmlFor="auth-email" className="block text-[13px] font-medium text-fg">
-                Email
-              </label>
-              <input
-                id="auth-email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                className="mt-2 w-full rounded-xl border border-line bg-panel-2 px-4 py-3 text-[15px] text-fg placeholder:text-muted/70 outline-none transition-colors focus:border-secondary"
-              />
-            </div>
+            {isLogin ? (
+              <div>
+                <label htmlFor="auth-identifier" className="block text-[13px] font-medium text-fg">
+                  Email or username
+                </label>
+                <input
+                  id="auth-identifier"
+                  name="identifier"
+                  type="text"
+                  autoComplete="username"
+                  placeholder="you@example.com"
+                  required
+                  disabled={pending}
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="auth-email" className="block text-[13px] font-medium text-fg">
+                  Email
+                </label>
+                <input
+                  id="auth-email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  maxLength={254}
+                  required
+                  disabled={pending}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            )}
 
             <div>
               <div className="flex items-center justify-between gap-4">
@@ -133,33 +251,42 @@ function AuthDialog({ mode, onClose }: { mode: Exclude<AuthMode, null>; onClose:
                 name="password"
                 type="password"
                 autoComplete={isLogin ? "current-password" : "new-password"}
-                placeholder={isLogin ? "••••••••" : "Create a password"}
-                className="mt-2 w-full rounded-xl border border-line bg-panel-2 px-4 py-3 text-[15px] text-fg placeholder:text-muted/70 outline-none transition-colors focus:border-secondary"
+                placeholder={isLogin ? "••••••••" : "At least 8 characters"}
+                minLength={isLogin ? undefined : 8}
+                maxLength={100}
+                required
+                disabled={pending}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={inputClass}
               />
             </div>
 
+            {error ? (
+              <p
+                role="alert"
+                aria-live="polite"
+                className="rounded-xl border border-accent-soft/40 bg-accent/10 px-4 py-3 text-[13.5px] leading-relaxed text-accent-soft"
+              >
+                {error}
+              </p>
+            ) : null}
+
             <button
               type="submit"
-              className="mt-2 inline-flex w-full items-center justify-center rounded-full bg-accent px-7 py-3.5 text-[15.5px] font-medium text-on-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-colors duration-200 hover:bg-accent-hover"
+              disabled={pending}
+              className="mt-2 inline-flex w-full items-center justify-center rounded-full bg-accent px-7 py-3.5 text-[15.5px] font-medium text-on-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-colors duration-200 hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {isLogin ? "Log in" : "Create account"}
+              {pending
+                ? isLogin
+                  ? "Logging in…"
+                  : "Creating account…"
+                : isLogin
+                  ? "Log in"
+                  : "Create account"}
             </button>
           </form>
 
-          <p className="mt-6 text-center text-[14px] text-muted">
-            {isLogin ? (
-              <>
-                Don&rsquo;t have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => {
-                    // switch handled by parent via state setter exposed? easier: use links to self state
-                  }}
-                  className="hidden"
-                />
-              </>
-            ) : null}
-          </p>
           {isLogin ? (
             <p className="mt-6 text-center text-[14px] text-muted">
               Don&rsquo;t have an account?{" "}
@@ -182,7 +309,7 @@ function AuthSwitch({ target, children }: { target: Exclude<AuthMode, null>; chi
   return (
     <button
       type="button"
-      onClick={target === "login" ? openLogin : openSignup}
+      onClick={target === "login" ? () => openLogin() : openSignup}
       className="font-medium text-secondary transition-colors hover:text-fg"
     >
       {children}
@@ -191,21 +318,112 @@ function AuthSwitch({ target, children }: { target: Exclude<AuthMode, null>; chi
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [open, setOpen] = useState<AuthMode>(null);
+  const [ready, setReady] = useState(false);
+  const [session, setSessionState] = useState<AuthResult | null>(null);
+  const pendingRedirect = useRef<string | null>(null);
 
-  const openLogin = useCallback(() => setOpen("login"), []);
+  // Read the persisted session after mount so server and client markup match.
+  // The URL can also ask for the dialog to open and carry a post-login target.
+  useEffect(() => {
+    setSessionState(readStoredSession());
+
+    const params = new URLSearchParams(window.location.search);
+    const auth = params.get("auth");
+
+    if (auth === "login" || auth === "signup") {
+      setOpen(auth);
+    }
+
+    const next = params.get("next");
+    if (next && next.startsWith("/") && !next.startsWith("//")) {
+      pendingRedirect.current = next;
+    }
+
+    if (params.has("auth") || params.has("next")) {
+      params.delete("auth");
+      params.delete("next");
+      const query = params.toString();
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
+      );
+    }
+
+    setReady(true);
+  }, []);
+
+  // Keep signed-in tabs in sync when one of them logs in or out.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === SESSION_KEY) {
+        setSessionState(readStoredSession());
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const openLogin = useCallback((nextPath?: string) => {
+    if (nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")) {
+      pendingRedirect.current = nextPath;
+    }
+    setOpen("login");
+  }, []);
   const openSignup = useCallback(() => setOpen("signup"), []);
-  const close = useCallback(() => setOpen(null), []);
+  const close = useCallback(() => {
+    pendingRedirect.current = null;
+    setOpen(null);
+  }, []);
+
+  const setSession = useCallback(
+    (next: AuthResult) => {
+      setSessionState(next);
+      try {
+        window.localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+      } catch {
+        // A blocked localStorage should not stop the in-memory session.
+      }
+
+      const target = pendingRedirect.current;
+      pendingRedirect.current = null;
+      if (target) {
+        router.replace(target);
+      }
+    },
+    [router],
+  );
+
+  const logout = useCallback(() => {
+    setSessionState(null);
+    try {
+      window.localStorage.removeItem(SESSION_KEY);
+    } catch {
+      // Nothing else to clean up when storage is unavailable.
+    }
+  }, []);
 
   const value = useMemo(
-    () => ({ open, openLogin, openSignup, close }),
-    [open, openLogin, openSignup, close],
+    () => ({
+      open,
+      openLogin,
+      openSignup,
+      close,
+      ready,
+      user: session ? { username: session.username, email: session.email } : null,
+      accessToken: session?.accessToken ?? null,
+      setSession,
+      logout,
+    }),
+    [open, openLogin, openSignup, close, ready, session, setSession, logout],
   );
 
   return (
     <AuthContext.Provider value={value}>
       {children}
-      {open ? <AuthDialog mode={open} onClose={close} /> : null}
+      {open ? <AuthDialog key={open} mode={open} onClose={close} /> : null}
     </AuthContext.Provider>
   );
 }

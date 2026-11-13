@@ -2,9 +2,9 @@
 
 ## Project overview
 
-Harbor is a self-hosted, backend-led PaaS prototype. The Spring Boot service manages users and projects, then deploys a project's Git repository by cloning it, building a Docker image, and starting a container. PostgreSQL stores users, projects, and deployment records. Traefik routes traffic to deployed containers using Docker labels, and deployment container logs are streamed over Server-Sent Events (SSE).
+Harbor is a self-hosted, backend-led PaaS prototype. The Spring Boot service manages users and projects, then deploys a project's Git repository by cloning it, building a Docker image, and starting a container. PostgreSQL stores users, projects, and deployment records. Traefik routes traffic to deployed containers using Docker labels, and deployment container logs are streamed over Server-Sent Events (SSE). A Next.js web console in `frontend/` provides the user-facing UI for auth, projects, deploys, and logs.
 
-The repository currently contains the backend and its deployment infrastructure; there is no frontend yet. Roadmap notes live in `dev_logs/`.
+The repository contains the backend, its deployment infrastructure, and the frontend console. Roadmap notes live in `dev_logs/`.
 
 ## Agent rules
 
@@ -28,7 +28,11 @@ The repository currently contains the backend and its deployment infrastructure;
 - `backend/src/main/java/com/waffles/harbor/config/`: application-level configuration such as the SSE executor.
 - `backend/src/test/`: unit, repository, controller, and integration tests.
 - `backend/Dockerfile`: multi-stage build for the backend image.
-- `docker-compose.yml`: PostgreSQL, Harbor backend, Traefik, and Cloudflare Tunnel services/networks.
+- `frontend/app/`: Next.js App Router pages, the authenticated console routes (`/dashboard`, `/projects/[projectId]`, `/deployments/[deploymentId]`), and `app/api/[...path]/route.ts`, which proxies `/api/*` to the backend.
+- `frontend/components/`: UI components, auth provider/session handling, dialogs, and status indicators.
+- `frontend/lib/`: typed backend API client, SSE log parser, and deployment URL helper.
+- `frontend/Dockerfile`: multi-stage production build for the frontend image.
+- `docker-compose.yml`: PostgreSQL, Harbor backend, Harbor frontend, Traefik, and Cloudflare Tunnel services/networks.
 - `dev_logs/`: phase plans and design decisions.
 
 ## Stack and local development
@@ -41,6 +45,10 @@ The repository currently contains the backend and its deployment infrastructure;
 - Start the stack from the repository root with `docker compose up --build` after configuring `.env`.
 - Build the backend directly from `backend/` with `./mvnw clean package`; run it with `./mvnw spring-boot:run` only after providing the required environment variables.
 - Run backend tests from `backend/` with `./mvnw test` (Windows: `mvnw.cmd test`). Tests that use Testcontainers need Docker available.
+- The frontend is Next.js 16 (App Router) with React 19, TypeScript, and Tailwind. From `frontend/`, use `npm run dev` for local work and `npm run build`/`npm run start` for the production build; `npm run typecheck` runs TypeScript.
+- `NEXT_PUBLIC_*` frontend values are inlined at build time (Compose passes them as build args), so changing `NEXT_PUBLIC_SITE_URL` or `NEXT_PUBLIC_DEPLOY_DOMAIN` requires rebuilding the frontend image.
+- The browser only talks to the frontend. Its `app/api/[...path]/route.ts` handler forwards `/api/*` to `INTERNAL_API_URL` (`http://spring:8080` in Compose, `http://localhost:8080` by default locally), forwarding headers, bodies, status codes, and streamed SSE bodies unchanged.
+- The backend is intentionally not published on a host port and has no Traefik labels; only the frontend joins `harbor-proxy`. Do not expose the backend directly without an explicit security decision.
 
 ## API areas
 
@@ -48,7 +56,7 @@ The repository currently contains the backend and its deployment infrastructure;
 - `/projects` provides authenticated project listing/creation, project lookup, repository URL configuration (`PUT /projects/{projectId}`), and deployment cleanup (`DELETE /projects/{projectId}/deployments`). Project names are unique per user.
 - `POST /deployments/{projectId}` creates a queued deployment record; `POST /deployments/{deploymentId}/execute` runs its Git/Docker work. `GET /deployments/{deploymentId}` returns one deployment, `GET /deployments/project/{projectId}` returns project history, `DELETE /deployments/{deploymentId}` removes a deployment and its resources, and `GET /deployments/{deploymentId}/logs` streams container logs as SSE.
 - `/sse` is a small standalone demo SSE endpoint currently present in addition to deployment log streaming.
-- Security is stateless JWT bearer authentication. `/auth/**`, `/users/**`, `/health`, and `/error` are public; everything else requires authentication. CORS currently allows any origin pattern with credentials, which is acceptable only for the prototype.
+- Security is stateless JWT bearer authentication. `/auth/**`, `/users/**`, `/health`, and `/error` are public; everything else requires authentication. CORS currently allows any origin pattern with credentials, which is acceptable only for the prototype. In Compose the backend is not publicly reachable; clients use the frontend's `/api/*` proxy.
 
 ## Deployment lifecycle
 
@@ -78,8 +86,8 @@ Containers are currently limited to 512 MiB memory, 0.5 CPU, 100 PIDs, and `noRe
 
 ## Current implementation boundaries
 
-Harbor has authentication, user-owned project management, repository URL configuration, persisted deployment records, Git cloning/commit identification, Docker image builds and container lifecycle operations, per-deployment network isolation, Traefik routing labels, startup routing recovery, and deployment container log streaming.
+Harbor has authentication, user-owned project management, repository URL configuration, persisted deployment records, Git cloning/commit identification, Docker image builds and container lifecycle operations, per-deployment network isolation, Traefik routing labels, startup routing recovery, deployment container log streaming, and an authenticated Next.js console.
 
-The roadmap describes additional work such as production routing/TLS, public access, CI/CD, rollback, monitoring, persistent logs, and a dashboard; treat those as planned unless implemented in source. Also note that deployment execution is request-driven rather than backed by a durable worker/queue, build logs are not streamed (only running container logs are), the `/sse` endpoint is a demo, and Compose contains machine-specific absolute paths.
+The roadmap describes additional work such as production routing/TLS, public access, CI/CD, rollback, monitoring, and persistent logs; treat those as planned unless implemented in source. Also note that deployment execution is request-driven rather than backed by a durable worker/queue, build logs are not streamed (only running container logs are), the `/sse` endpoint is a demo, and Compose contains machine-specific absolute paths.
 
 Review the current Compose configuration and environment before changing filesystem paths or network names, since the backend, deployment containers, and Traefik share those assumptions.

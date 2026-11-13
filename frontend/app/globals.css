@@ -247,11 +247,60 @@ html[data-theme="light"] {
   opacity: var(--scene-reflect-opacity);
 }
 
-/* at dawn the lamp is out: tower stays, beam and reflection go */
+.scene-moon {
+  background: radial-gradient(circle at 35% 35%, #f4f7fb 0%, #dce6f2 55%, #c4d3e6 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 40px rgba(177, 205, 236, 0.18),
+    0 0 90px rgba(177, 205, 236, 0.1);
+  opacity: 0.9;
+  transform: translateY(0);
+  transition:
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.9s ease;
+  will-change: transform, opacity;
+}
+
+.scene-moon::after {
+  content: "";
+  position: absolute;
+  top: -6%;
+  left: 28%;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--scene-sky-2);
+}
+
+.scene-sun {
+  background: radial-gradient(circle at 40% 40%, #fff7e6 0%, #ffd9a8 45%, #ffbf7a 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.35),
+    0 0 50px rgba(255, 200, 120, 0.45),
+    0 0 120px rgba(255, 170, 90, 0.25);
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.9s ease;
+  will-change: transform, opacity;
+}
+
+/* at dawn the lamp is out and the sun rises: tower stays, beam/reflection go */
 html[data-theme="light"] .scene-beam,
 html[data-theme="light"] .lamp-glow,
 html[data-theme="light"] .scene-reflection {
   display: none;
+}
+
+html[data-theme="light"] .scene-moon {
+  opacity: 0;
+  transform: translateY(28px);
+}
+
+html[data-theme="light"] .scene-sun {
+  opacity: 0.95;
+  transform: translateY(0);
 }
 
 /* ---------- entrance and scroll motion ---------- */
@@ -376,6 +425,14 @@ html[data-theme="light"] .logo-mark {
   border-radius: 9999px;
   background: currentColor;
   animation: live-ping 2.8s ease-out infinite;
+}
+
+/* ---------- ship-shaped CTA buttons ---------- */
+.btn-ship {
+  border-radius: 0 !important;
+  clip-path: polygon(6% 0%, 94% 0%, 100% 100%, 0% 100%);
+  padding-left: 2.2rem;
+  padding-right: 2.2rem;
 }
 
 @keyframes live-ping {

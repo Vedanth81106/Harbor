@@ -13,8 +13,7 @@ const links = [
 ];
 
 export function SiteHeader() {
-  const { openLogin, openSignup } = useAuth();
-
+  const { openLogin, openSignup, user, logout } = useAuth();
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-veil backdrop-blur-md">
       <div className="relative flex h-[80px] w-full items-center justify-between gap-2 px-4 sm:px-8">
@@ -40,10 +39,39 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-2 sm:gap-3">
           <ThemeToggle />
-          <Button variant="ghost" onClick={openLogin}>
-            Log in
-          </Button>
-          <Button onClick={openSignup}>Sign up</Button>
+          {user ? (
+            <>
+              <Button
+                href="/dashboard"
+                variant="ghost"
+                className="hidden sm:inline-flex"
+              >
+                Dashboard
+              </Button>
+              <Link
+                href="/dashboard"
+                className="text-[14px] text-muted transition-colors hover:text-fg sm:hidden"
+              >
+                Dashboard
+              </Link>
+              <span
+                className="hidden max-w-[16ch] truncate text-[14px] text-muted md:inline"
+                title={user.username}
+              >
+                {user.username}
+              </span>
+              <Button variant="ghost" onClick={logout}>
+                Log out
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={() => openLogin()}>
+                Log in
+              </Button>
+              <Button onClick={openSignup}>Sign up</Button>
+            </>
+          )}
         </div>
       </div>
     </header>

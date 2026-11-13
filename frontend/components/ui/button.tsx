@@ -32,6 +32,8 @@ type LinkProps = CommonProps & {
   href: string;
   onClick?: never;
   type?: never;
+  target?: string;
+  rel?: string;
 };
 
 type NativeButtonProps = CommonProps &
@@ -45,7 +47,12 @@ export function Button(props: LinkProps | NativeButtonProps) {
 
   if ("href" in props && props.href) {
     return (
-      <Link href={props.href} className={classes}>
+      <Link
+        href={props.href}
+        className={classes}
+        target={props.target}
+        rel={props.rel}
+      >
         {children}
       </Link>
     );
