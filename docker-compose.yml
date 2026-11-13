@@ -23,8 +23,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: harbor_backend
-    ports:
-      - 8080:8080
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${DB_NAME}
       SPRING_DATASOURCE_USERNAME: ${DB_USER}
@@ -40,6 +38,31 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HARBOR_WORKSPACE:-./tmp}:/harbor-workspace
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+        NEXT_PUBLIC_DEPLOY_DOMAIN: ${NEXT_PUBLIC_DEPLOY_DOMAIN:-${DOMAIN:-}}
+    container_name: harbor_frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      # Reached over harbor-network; never published or routed publicly.
+      INTERNAL_API_URL: http://spring:8080
+    depends_on:
+      - spring
+    networks:
+      - harbor-network
+      - harbor-proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=harbor-proxy"
+      - "traefik.http.routers.harbor-frontend.entrypoints=web"
+      - "traefik.http.routers.harbor-frontend.rule=Host(`${FRONTEND_HOST:-harbor.${DOMAIN:-localhost}}`)"
+      - "traefik.http.services.harbor-frontend.loadbalancer.server.port=3000"
 
   traefik:
     image: "traefik:v3.6"
