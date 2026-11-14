@@ -1,0 +1,12 @@
+# Keep the build context small: none of this is used by the Dockerfile.
+# target/ is ~80MB of build output and would otherwise be uploaded on every build.
+
+target/
+.git/
+.gitignore
+.idea/
+.vscode/
+*.iml
+*.log
+Dockerfile
+.dockerignore
