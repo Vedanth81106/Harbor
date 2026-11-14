@@ -1,5 +1,4 @@
-name: Build and push images
-
+name: GHCR Image build
 on:
   push:
     branches: [ "main" ]
@@ -30,7 +29,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       
       # Build and push the backend
-      - name: Build docker image
+      - name: Build backend docker image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
@@ -38,3 +37,18 @@ jobs:
           tags: |
               ghcr.io/vedanth81106/harbor-backend:latest
               ghcr.io/vedanth81106/harbor-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Build and push the frontend
+      - name: Build frontend docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+              ghcr.io/vedanth81106/harbor-frontend:latest
+              ghcr.io/vedanth81106/harbor-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
