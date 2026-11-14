@@ -6,6 +6,7 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 jobs:
   buildx:
@@ -37,8 +38,8 @@ jobs:
           tags: |
               ghcr.io/vedanth81106/harbor-backend:latest
               ghcr.io/vedanth81106/harbor-backend:${{ github.sha }}
-          cache-from: type=gha, scope=backend
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
 
       # Build and push the frontend
       - name: Build frontend docker image
@@ -52,6 +53,37 @@ jobs:
           build-args: |
             NEXT_PUBLIC_DEPLOY_DOMAIN=webwaffles.me
             NEXT_PUBLIC_SITE_URL=https://harbor.webwaffles.me
-          cache-from: type=gha, scope=frontend
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+            
+      # Connect to tailscale
+      - name: Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          audience: ${{ secrets.TS_AUDIENCE }}
+          tags: tag:cicd
+      
+      # Deploy
+      - name: Deploy
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DONUTS_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DONUTS_KNOWN_HOSTS }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+          ssh -i ~/.ssh/id_ed25519 \
+            vedanth@donuts \
+            "cd /opt/harbor &&
+             export IMAGE_TAG='$IMAGE_TAG' &&
+             docker compose pull spring frontend &&
+             docker compose up -d --no-deps spring frontend"
 
