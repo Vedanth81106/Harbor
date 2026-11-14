@@ -37,7 +37,7 @@ jobs:
           tags: |
               ghcr.io/vedanth81106/harbor-backend:latest
               ghcr.io/vedanth81106/harbor-backend:${{ github.sha }}
-          cache-from: type=gha
+          cache-from: type=gha, scope=backend
           cache-to: type=gha,mode=max
 
       # Build and push the frontend
@@ -49,6 +49,9 @@ jobs:
           tags: |
               ghcr.io/vedanth81106/harbor-frontend:latest
               ghcr.io/vedanth81106/harbor-frontend:${{ github.sha }}
-          cache-from: type=gha
+          build-args: |
+            NEXT_PUBLIC_DEPLOY_DOMAIN=webwaffles.me
+            NEXT_PUBLIC_SITE_URL=https://harbor.webwaffles.me
+          cache-from: type=gha, scope=frontend
           cache-to: type=gha,mode=max
 
