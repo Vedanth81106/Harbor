@@ -9,6 +9,7 @@ import com.github.dockerjava.api.command.InspectImageResponse;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.HostConfig;
+import com.github.dockerjava.api.model.LogConfig;
 import com.github.dockerjava.api.model.RestartPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,10 +17,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.io.IOException;
+import java.sql.Time;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Service
 @RequiredArgsConstructor
@@ -38,16 +43,23 @@ public class DockerService {
     private static final long PID_LIMIT = 100L;
 
     private final DockerClient dockerClient;
-    public void buildImage(String filePath, String imageTag) {
+    public void buildImage(String filePath, String imageTag) throws
+            InterruptedException, TimeoutException, IOException {
         File buildDirectory = new File(filePath);
         File dockerfile = new File(buildDirectory, "Dockerfile");
 
-        dockerClient.buildImageCmd()
-                .withBaseDirectory(buildDirectory)
-                .withDockerfile(dockerfile)
-                .withTags(Collections.singleton(imageTag))
-                .exec(new BuildImageResultCallback())
-                .awaitImageId();
+        try(BuildImageResultCallback callback = new BuildImageResultCallback()){
+            dockerClient.buildImageCmd()
+                    .withBaseDirectory(buildDirectory)
+                    .withDockerfile(dockerfile)
+                    .withTags(Collections.singleton(imageTag))
+                    .exec(callback);
+
+            boolean completed = callback.awaitCompletion(10, TimeUnit.MINUTES);
+            if(!completed) throw new TimeoutException("Docker image build exceeded 10 minutes and timed out");
+
+            callback.awaitImageId();
+        }
     }
 
     public String createContainer(
@@ -67,6 +79,9 @@ public class DockerService {
                     .withMemory(MEMORY_LIMIT)
                     .withCpuPeriod(CPU_PERIOD)
                     .withCpuQuota(CPU_QUOTA)
+                    .withLogConfig(new LogConfig(
+                            LogConfig.LoggingType.JSON_FILE,
+                            Map.of("max-size", "10m", "max-file", "3")))
                     .withRestartPolicy(RestartPolicy.unlessStoppedRestart());
 
             Map<String, String> labels = createTraefikLabels(
@@ -200,8 +215,6 @@ public class DockerService {
                     "Traefik or network attachment {} is already absent.",
                     networkName
             );
-        } catch (RuntimeException e) {
-            log.warn("Could not disconnect Traefik from {}.", networkName, e);
         }
 
         if (containerId != null) {
@@ -209,10 +222,9 @@ public class DockerService {
                 dockerClient.removeContainerCmd(containerId)
                         .withForce(true)
                         .exec();
+
             } catch (NotFoundException e) {
                 log.debug("Container {} is already absent.", containerId);
-            } catch (RuntimeException e) {
-                log.warn("Could not remove container {}.", containerId, e);
             }
         }
 
@@ -273,12 +285,6 @@ public class DockerService {
             dockerClient.removeNetworkCmd(networkName).exec();
         } catch (NotFoundException e) {
             log.debug("Network {} is already absent.", networkName);
-        } catch (RuntimeException e) {
-            log.warn(
-                    "Could not remove network {}. It may still be in use.",
-                    networkName,
-                    e
-            );
         }
     }
 

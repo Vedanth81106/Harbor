@@ -6,6 +6,7 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PWD}
       POSTGRES_DB: ${DB_NAME}
+    restart: unless-stopped
     ports:
       - "127.0.0.1:5433:5432"
     healthcheck:
@@ -30,9 +31,16 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       DOMAIN_NAME: ${DOMAIN}
       CONFIG_PATH: /harbor-workspace
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", " wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     networks:
       - harbor-network
     volumes:
@@ -67,6 +75,7 @@ services:
   traefik:
     image: "traefik:v3.6"
     container_name: "traefik"
+    restart: unless-stopped
     command:
       - "--api.insecure=false"
       - "--providers.docker=true"

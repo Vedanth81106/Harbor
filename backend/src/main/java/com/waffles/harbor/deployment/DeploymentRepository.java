@@ -3,6 +3,7 @@ package com.waffles.harbor.deployment;
 import com.waffles.harbor.user.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,5 +15,6 @@ public interface DeploymentRepository extends JpaRepository<Deployment, UUID> {
     // if any deployment exists that has image name and any deployment with deployment id OTHER than give one
     boolean existsByImageNameAndDeploymentIdNot(String imageName, UUID deploymentId);
     List<Deployment> findByStatus(DeploymentStatus status);
+    List<Deployment> findByStatusIn(Collection<DeploymentStatus> statuses);
     boolean existsByImageName(String imageName);
 }

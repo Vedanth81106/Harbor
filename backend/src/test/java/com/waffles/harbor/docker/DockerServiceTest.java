@@ -30,6 +30,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedConstruction;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -38,9 +39,11 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.*;
@@ -66,23 +69,30 @@ class DockerServiceTest {
     // ---------- buildImage ----------
 
     @Test
-    void shouldBuildImageWithDirectoryAndDockerfile(@TempDir Path directory) {
+    void shouldBuildImageWithDirectoryAndDockerfile(@TempDir Path directory) throws Exception {
         BuildImageCmd buildImageCmd = mock(BuildImageCmd.class);
-        BuildImageResultCallback callback = mock(BuildImageResultCallback.class);
 
         when(dockerClient.buildImageCmd()).thenReturn(buildImageCmd);
         when(buildImageCmd.withBaseDirectory(any(File.class))).thenReturn(buildImageCmd);
         when(buildImageCmd.withDockerfile(any(File.class))).thenReturn(buildImageCmd);
         when(buildImageCmd.withTags(anySet())).thenReturn(buildImageCmd);
-        when(buildImageCmd.exec(any(BuildImageResultCallback.class))).thenReturn(callback);
-        when(callback.awaitImageId()).thenReturn("image-id");
 
-        dockerService.buildImage(directory.toString(), "project:latest");
+        try (MockedConstruction<BuildImageResultCallback> construction = mockConstruction(
+                BuildImageResultCallback.class,
+                (callback, context) -> {
+                    when(callback.awaitCompletion(anyLong(), any(TimeUnit.class))).thenReturn(true);
+                    when(callback.awaitImageId()).thenReturn("image-id");
+                })) {
+
+            dockerService.buildImage(directory.toString(), "project:latest");
+
+            assertEquals(1, construction.constructed().size());
+            verify(construction.constructed().get(0)).awaitImageId();
+        }
 
         verify(buildImageCmd).withBaseDirectory(new File(directory.toString()));
         verify(buildImageCmd).withDockerfile(new File(directory.toFile(), "Dockerfile"));
         verify(buildImageCmd).withTags(Set.of("project:latest"));
-        verify(callback).awaitImageId();
     }
 
     // ---------- createContainer ----------
