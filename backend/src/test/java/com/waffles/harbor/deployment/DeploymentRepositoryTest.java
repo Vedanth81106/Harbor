@@ -61,6 +61,7 @@ class DeploymentRepositoryTest {
     private Deployment createDeployment(Project project, DeploymentStatus status) {
         return Deployment.builder()
                 .project(project)
+                .deploymentType(DeploymentType.DOCKERFILE)
                 .status(status)
                 .build();
     }
