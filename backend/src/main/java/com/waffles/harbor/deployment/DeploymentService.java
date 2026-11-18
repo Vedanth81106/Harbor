@@ -1,11 +1,12 @@
 
 package com.waffles.harbor.deployment;
 
+import com.waffles.harbor.compose.ComposeFileDetector;
 import com.waffles.harbor.docker.DockerService;
+import com.waffles.harbor.dockerfile.DockerfileService;
 import com.waffles.harbor.exception.DeploymentNotFoundException;
 import com.waffles.harbor.exception.DeploymentStateException;
 import com.waffles.harbor.exception.ProjectNotFoundException;
-import com.waffles.harbor.git.GitCommit;
 import com.waffles.harbor.git.GitService;
 import com.waffles.harbor.project.Project;
 import com.waffles.harbor.project.ProjectRepository;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +42,8 @@ public class DeploymentService {
     private final GitService gitService;
     private final DockerService dockerService;
     private final SseService sseService;
+    private final DockerfileService dockerfileService;
+    private final ComposeFileDetector composeFileDetector;
 
     public List<DeploymentResponse> getAllDeployments(
             User user,
@@ -81,6 +85,7 @@ public class DeploymentService {
 
         Deployment deployment = Deployment.builder()
                 .project(project)
+                .deploymentType(DeploymentType.DOCKERFILE)
                 .status(DeploymentStatus.QUEUED)
                 .build();
 
@@ -104,20 +109,19 @@ public class DeploymentService {
 
             updateStatus(deployment, DeploymentStatus.CLONING);
             cloneRepository(deployment, directory);
+            deployment.setDeploymentType(detectDeploymentType(directory));
 
-            updateStatus(deployment, DeploymentStatus.BUILDING);
-            buildDeploymentImage(deployment, directory);
-
-            updateStatus(deployment, DeploymentStatus.STARTING);
-            startDeploymentContainer(deployment);
-
-            updateStatus(deployment, DeploymentStatus.READY);
+            switch (deployment.getDeploymentType()) {
+                case DOCKERFILE -> deployDockerfile(deployment, directory);
+                case COMPOSE -> throw new DeploymentStateException(
+                        "Compose deployments are not supported yet"
+                );
+            }
             return toResponse(deployment);
 
         } catch (Exception deploymentException) {
             try {
-                deleteImagesAndContainers(deployment);
-                deleteDeploymentDirectory(deployment);
+                deleteDeploymentResources(deployment);
             } catch (RuntimeException cleanupException) {
                 deploymentException.addSuppressed(cleanupException);
                 log.error(
@@ -136,9 +140,22 @@ public class DeploymentService {
     public void deleteDeployment(User user, UUID deploymentId) {
         Deployment deployment = findDeployment(user, deploymentId);
 
-        deleteImagesAndContainers(deployment);
-        deleteDeploymentDirectory(deployment);
+        deleteDeploymentResources(deployment);
         deploymentRepository.delete(deployment);
+    }
+
+    private void deleteDeploymentResources(Deployment deployment) {
+        if (deployment.getDeploymentType() == DeploymentType.DOCKERFILE) {
+            dockerfileService.deleteContainer(
+                    deployment.getDeploymentId(),
+                    deployment.getContainerId()
+            );
+        }
+
+        // TODO: add docker compose deletion
+
+        removeImageIfUnreferenced(deployment);
+        deleteDeploymentDirectory(deployment);
     }
 
     @Transactional
@@ -160,8 +177,7 @@ public class DeploymentService {
 
         // Clean up Docker resources and files first.
         for (Deployment deployment : deployments) {
-            deleteImagesAndContainers(deployment);
-            deleteDeploymentDirectory(deployment);
+            deleteDeploymentResources(deployment);
         }
 
         // orphanRemoval = true deletes the child records.
@@ -206,47 +222,46 @@ public class DeploymentService {
         gitService.cloneRepository(repositoryUrl, filePath, 60);
     }
 
-    private void buildDeploymentImage(
+    private void deployDockerfile(
             Deployment deployment,
-            String filePath
+            String directory
     ) throws Exception {
-        GitCommit latestCommit = gitService.getLatestCommit(filePath);
-
-        deployment.setCommitHash(latestCommit.getHash());
-        deployment.setImageName(
+        updateStatus(deployment, DeploymentStatus.BUILDING);
+        DockerfileService.BuiltImage image = dockerfileService.buildImage(
+                directory,
                 deployment.getProject().getProjectId()
-                        + ":" + latestCommit.getHash()
         );
 
+        deployment.setCommitHash(image.commitHash());
+        deployment.setImageName(image.imageName());
         deploymentRepository.save(deployment);
 
-        dockerService.buildImage(
-                filePath,
+        updateStatus(deployment, DeploymentStatus.STARTING);
+        String containerId = dockerfileService.createContainer(
+                deployment.getDeploymentId(),
                 deployment.getImageName()
-        );
-    }
-
-    private void startDeploymentContainer(Deployment deployment) {
-        int containerPort = dockerService.getExposedImagePort(
-                deployment.getImageName()
-        );
-
-        UUID deploymentId = deployment.getDeploymentId();
-        String containerName = "harbor-"
-                + deploymentId.toString().substring(0, 8);
-
-        String containerId = dockerService.createContainer(
-                deploymentId,
-                deployment.getImageName(),
-                containerPort,
-                containerName
         );
 
         // Persist the ID before starting so failure cleanup can find it.
         deployment.setContainerId(containerId);
         deploymentRepository.save(deployment);
+        dockerfileService.startContainer(containerId, deployment.getDeploymentId());
 
-        dockerService.startContainer(containerId, deploymentId);
+        updateStatus(deployment, DeploymentStatus.READY);
+    }
+
+    private DeploymentType detectDeploymentType(String directory) {
+        // A Dockerfile wins when a repository has both, so Dockerfile
+        // projects keep deploying even if a compose file is also present.
+        if (Files.isRegularFile(Path.of(directory, "Dockerfile"))) {
+            return DeploymentType.DOCKERFILE;
+        }
+
+        if (composeFileDetector.detectComposeFiles(directory).isPresent()) {
+            return DeploymentType.COMPOSE;
+        }
+
+        return DeploymentType.DOCKERFILE;
     }
 
     private String getDeploymentDirectory(Deployment deployment) {
@@ -284,13 +299,7 @@ public class DeploymentService {
         }
     }
 
-    private void deleteImagesAndContainers(Deployment deployment) {
-        // Also cleans up a network when no container ID was saved.
-        dockerService.tearDownDeployment(
-                deployment.getContainerId(),
-                deployment.getDeploymentId()
-        );
-
+    private void removeImageIfUnreferenced(Deployment deployment) {
         String imageName = deployment.getImageName();
 
         if (imageName != null

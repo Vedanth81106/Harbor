@@ -1,11 +1,12 @@
 package com.waffles.harbor.deployment;
 
 import com.waffles.harbor.auth.Role;
+import com.waffles.harbor.compose.ComposeFileDetector;
 import com.waffles.harbor.docker.DockerService;
+import com.waffles.harbor.dockerfile.DockerfileService;
 import com.waffles.harbor.exception.DeploymentNotFoundException;
 import com.waffles.harbor.exception.DeploymentStateException;
 import com.waffles.harbor.exception.ProjectNotFoundException;
-import com.waffles.harbor.git.GitCommit;
 import com.waffles.harbor.git.GitService;
 import com.waffles.harbor.project.Project;
 import com.waffles.harbor.project.ProjectRepository;
@@ -51,6 +52,12 @@ class DeploymentServiceTest {
     @Mock
     private SseService sseService;
 
+    @Mock
+    private DockerfileService dockerfileService;
+
+    @Mock
+    private ComposeFileDetector composeFileDetector;
+
     @InjectMocks
     private DeploymentService deploymentService;
 
@@ -92,6 +99,7 @@ class DeploymentServiceTest {
         deployment = Deployment.builder()
                 .deploymentId(deploymentId)
                 .project(project)
+                .deploymentType(DeploymentType.DOCKERFILE)
                 .status(DeploymentStatus.QUEUED)
                 .build();
     }
@@ -232,6 +240,7 @@ class DeploymentServiceTest {
 
         Deployment saved = captor.getValue();
         assertEquals(DeploymentStatus.QUEUED, saved.getStatus());
+        assertEquals(DeploymentType.DOCKERFILE, saved.getDeploymentType());
         assertSame(project, saved.getProject());
 
         assertEquals(deploymentId, response.getDeploymentId());
@@ -263,22 +272,20 @@ class DeploymentServiceTest {
                 () -> deploymentService.executeDeployment(user, deploymentId)
         );
 
-        verifyNoInteractions(gitService, dockerService);
+        verifyNoInteractions(gitService, dockerService, dockerfileService);
     }
 
     @Test
     void shouldExecuteQueuedDeployment() throws Exception {
         when(deploymentRepository.findByDeploymentIdAndProject_User(deploymentId, user))
                 .thenReturn(Optional.of(deployment));
-        when(gitService.getLatestCommit(anyString()))
-                .thenReturn(GitCommit.builder().hash("abc123").build());
-        when(dockerService.getExposedImagePort(projectId + ":abc123")).thenReturn(8080);
-        when(dockerService.createContainer(
-                eq(deploymentId),
-                eq(projectId + ":abc123"),
-                eq(8080),
-                eq("harbor-" + deploymentId.toString().substring(0, 8))
-        )).thenReturn("container-id");
+        when(dockerfileService.buildImage(deploymentDirectory(), projectId))
+                .thenReturn(new DockerfileService.BuiltImage(
+                        "abc123",
+                        projectId + ":abc123"
+                ));
+        when(dockerfileService.createContainer(deploymentId, projectId + ":abc123"))
+                .thenReturn("container-id");
 
         DeploymentResponse response = deploymentService.executeDeployment(user, deploymentId);
 
@@ -292,9 +299,56 @@ class DeploymentServiceTest {
                 deploymentDirectory(),
                 60
         );
-        verify(dockerService).buildImage(deploymentDirectory(), projectId + ":abc123");
-        verify(dockerService).startContainer("container-id", deploymentId);
+        verify(dockerfileService).buildImage(deploymentDirectory(), projectId);
+        verify(dockerfileService).startContainer("container-id", deploymentId);
         verify(deploymentRepository, atLeast(4)).save(deployment);
+    }
+
+    @Test
+    void shouldRejectComposeDeploymentUntilComposeIsImplemented() throws Exception {
+        Path directory = Path.of(deploymentDirectory());
+        Files.createDirectories(directory);
+        Path composeFile = directory.resolve("compose.yaml");
+        Files.writeString(composeFile, "services: {}");
+
+        when(deploymentRepository.findByDeploymentIdAndProject_User(deploymentId, user))
+                .thenReturn(Optional.of(deployment));
+        when(composeFileDetector.detectComposeFiles(deploymentDirectory()))
+                .thenReturn(Optional.of(composeFile));
+
+        DeploymentStateException exception = assertThrows(
+                DeploymentStateException.class,
+                () -> deploymentService.executeDeployment(user, deploymentId)
+        );
+
+        assertTrue(exception.getMessage().contains("Compose"));
+        assertEquals(DeploymentType.COMPOSE, deployment.getDeploymentType());
+        assertEquals(DeploymentStatus.FAILED, deployment.getStatus());
+        verifyNoInteractions(dockerfileService);
+    }
+
+    @Test
+    void shouldPreferDockerfileWhenAComposeFileIsAlsoPresent() throws Exception {
+        Path directory = Path.of(deploymentDirectory());
+        Files.createDirectories(directory);
+        Files.writeString(directory.resolve("Dockerfile"), "FROM scratch");
+        Files.writeString(directory.resolve("compose.yaml"), "services: {}");
+
+        when(deploymentRepository.findByDeploymentIdAndProject_User(deploymentId, user))
+                .thenReturn(Optional.of(deployment));
+        when(dockerfileService.buildImage(deploymentDirectory(), projectId))
+                .thenReturn(new DockerfileService.BuiltImage(
+                        "abc123",
+                        projectId + ":abc123"
+                ));
+        when(dockerfileService.createContainer(deploymentId, projectId + ":abc123"))
+                .thenReturn("container-id");
+
+        DeploymentResponse response = deploymentService.executeDeployment(user, deploymentId);
+
+        assertEquals(DeploymentStatus.READY, response.getStatus());
+        assertEquals(DeploymentType.DOCKERFILE, deployment.getDeploymentType());
+        verify(dockerfileService).buildImage(deploymentDirectory(), projectId);
     }
 
     @Test
@@ -311,7 +365,7 @@ class DeploymentServiceTest {
         assertTrue(exception.getMessage().contains("repository"));
         assertEquals(DeploymentStatus.FAILED, deployment.getStatus());
         verifyNoInteractions(gitService);
-        verify(dockerService).tearDownDeployment(null, deploymentId);
+        verify(dockerfileService).deleteContainer(deploymentId, null);
         verify(dockerService, never()).removeImage(any());
         // CLONING is persisted before the failure, then FAILED is persisted.
         verify(deploymentRepository, times(2)).save(deployment);
@@ -331,7 +385,7 @@ class DeploymentServiceTest {
 
         assertEquals("clone failed", thrown.getMessage());
         assertEquals(DeploymentStatus.FAILED, deployment.getStatus());
-        verify(dockerService).tearDownDeployment(null, deploymentId);
+        verify(dockerfileService).deleteContainer(deploymentId, null);
         // CLONING is persisted before the failure, then FAILED is persisted.
         verify(deploymentRepository, times(2)).save(deployment);
     }
@@ -344,7 +398,7 @@ class DeploymentServiceTest {
         RuntimeException primary = new RuntimeException("clone failed");
         doThrow(primary).when(gitService).cloneRepository(anyString(), anyString(), eq(60));
         doThrow(new RuntimeException("cleanup failed"))
-                .when(dockerService).tearDownDeployment(nullable(String.class), any());
+                .when(dockerfileService).deleteContainer(eq(deploymentId), isNull());
 
         RuntimeException thrown = assertThrows(
                 RuntimeException.class,
@@ -368,7 +422,7 @@ class DeploymentServiceTest {
                 () -> deploymentService.deleteDeployment(user, deploymentId)
         );
 
-        verifyNoInteractions(dockerService);
+        verifyNoInteractions(dockerService, dockerfileService);
     }
 
     @Test
@@ -387,7 +441,7 @@ class DeploymentServiceTest {
 
         deploymentService.deleteDeployment(user, deploymentId);
 
-        verify(dockerService).tearDownDeployment("container-id", deploymentId);
+        verify(dockerfileService).deleteContainer(deploymentId, "container-id");
         verify(dockerService).removeImage("project:1");
         verify(deploymentRepository).delete(deployment);
         assertFalse(Files.exists(directory));
@@ -405,6 +459,7 @@ class DeploymentServiceTest {
 
         deploymentService.deleteDeployment(user, deploymentId);
 
+        verify(dockerfileService).deleteContainer(deploymentId, "container-id");
         verify(dockerService, never()).removeImage(any());
     }
 
@@ -418,7 +473,7 @@ class DeploymentServiceTest {
                 () -> deploymentService.deleteAllDeploymentsForProject(user, projectId)
         );
 
-        verifyNoInteractions(dockerService);
+        verifyNoInteractions(dockerService, dockerfileService);
     }
 
     @Test
@@ -429,6 +484,7 @@ class DeploymentServiceTest {
         Deployment second = Deployment.builder()
                 .deploymentId(UUID.randomUUID())
                 .project(project)
+                .deploymentType(DeploymentType.DOCKERFILE)
                 .status(DeploymentStatus.READY)
                 .containerId("second-container")
                 .imageName("project:2")
@@ -444,8 +500,8 @@ class DeploymentServiceTest {
 
         deploymentService.deleteAllDeploymentsForProject(user, projectId);
 
-        verify(dockerService).tearDownDeployment("first-container", deploymentId);
-        verify(dockerService).tearDownDeployment("second-container", second.getDeploymentId());
+        verify(dockerfileService).deleteContainer(deploymentId, "first-container");
+        verify(dockerfileService).deleteContainer(second.getDeploymentId(), "second-container");
         // Each image is removed during per-deployment cleanup and again by the
         // image de-duplication pass.
         verify(dockerService, times(2)).removeImage("project:1");
@@ -468,6 +524,7 @@ class DeploymentServiceTest {
 
         deploymentService.deleteAllDeploymentsForProject(user, projectId);
 
+        verify(dockerfileService).deleteContainer(deploymentId, "container-id");
         verify(dockerService, never()).removeImage(any());
     }
 }
