@@ -1,4 +1,4 @@
-package com.waffles.harbor.deployment;
+package com.waffles.harbor.deployment.enums;
 
 public enum DeploymentStatus {
 

@@ -308,9 +308,9 @@ export default function DeploymentPage() {
           </Detail>
 
           <Detail label="Image">
-            {deployment.imageName ? (
+            {deployment.imageNames.length > 0 ? (
               <span className="break-all font-mono text-[12.5px]">
-                {deployment.imageName}
+                {deployment.imageNames.join(", ")}
               </span>
             ) : (
               <span className="text-muted">Not built yet</span>

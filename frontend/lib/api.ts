@@ -40,7 +40,7 @@ export type Deployment = {
   projectId: string;
   status: DeploymentStatus;
   commitHash: string | null;
-  imageName: string | null;
+  imageNames: string[];
   hostPort: number;
 };
 

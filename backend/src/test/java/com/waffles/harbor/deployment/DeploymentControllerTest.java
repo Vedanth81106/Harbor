@@ -1,6 +1,7 @@
 package com.waffles.harbor.deployment;
 
 import com.waffles.harbor.auth.Role;
+import com.waffles.harbor.deployment.enums.DeploymentStatus;
 import com.waffles.harbor.exception.DeploymentNotFoundException;
 import com.waffles.harbor.exception.DeploymentStateException;
 import com.waffles.harbor.security.JwtService;
@@ -52,7 +53,7 @@ class DeploymentControllerTest {
                 .projectId(projectId)
                 .status(DeploymentStatus.READY)
                 .commitHash("abc123")
-                .imageName("project:abc123")
+                .imageNames(List.of("project:abc123"))
                 .build();
     }
 
