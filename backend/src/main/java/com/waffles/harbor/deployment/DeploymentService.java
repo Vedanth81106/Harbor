@@ -2,8 +2,13 @@
 package com.waffles.harbor.deployment;
 
 import com.waffles.harbor.compose.ComposeFileDetector;
+import com.waffles.harbor.deployment.enums.DeploymentStatus;
+import com.waffles.harbor.deployment.enums.DeploymentType;
+import com.waffles.harbor.deployment.enums.ResourceType;
+import com.waffles.harbor.deployment.strategy.DeploymentResult;
+import com.waffles.harbor.deployment.strategy.DeploymentStrategy;
+import com.waffles.harbor.deployment.strategy.DeploymentStrategyFactory;
 import com.waffles.harbor.docker.DockerService;
-import com.waffles.harbor.dockerfile.DockerfileService;
 import com.waffles.harbor.exception.DeploymentNotFoundException;
 import com.waffles.harbor.exception.DeploymentStateException;
 import com.waffles.harbor.exception.ProjectNotFoundException;
@@ -22,11 +27,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,8 +43,8 @@ public class DeploymentService {
     private final GitService gitService;
     private final DockerService dockerService;
     private final SseService sseService;
-    private final DockerfileService dockerfileService;
     private final ComposeFileDetector composeFileDetector;
+    private final DeploymentStrategyFactory deploymentStrategyFactory;
 
     public List<DeploymentResponse> getAllDeployments(
             User user,
@@ -67,11 +68,15 @@ public class DeploymentService {
 
     public SseEmitter getDeploymentLogs(User user, UUID deploymentId) {
         Deployment deployment = findDeployment(user, deploymentId);
-        String containerId = deployment.getContainerId();
 
-        if (containerId == null) {
+        DeploymentResource container =
+                deployment.getSingleContainerResource();
+
+        String containerId = container.getExternalId();
+
+        if (containerId == null || containerId.isBlank()) {
             throw new IllegalStateException(
-                    "Deployment does not have a container"
+                    "Deployment does not have a valid container"
             );
         }
 
@@ -110,20 +115,31 @@ public class DeploymentService {
             updateStatus(deployment, DeploymentStatus.CLONING);
             cloneRepository(deployment, directory);
             deployment.setDeploymentType(detectDeploymentType(directory));
+            deploymentRepository.save(deployment);
 
-            switch (deployment.getDeploymentType()) {
-                case DOCKERFILE -> deployDockerfile(deployment, directory);
-                case COMPOSE -> throw new DeploymentStateException(
-                        "Compose deployments are not supported yet"
-                );
-            }
+            DeploymentStrategy strategy =
+                    deploymentStrategyFactory.getStrategy(deployment.getDeploymentType());
+
+            updateStatus(deployment, DeploymentStatus.BUILDING);
+            DeploymentResult result = strategy.prepare(deployment,Path.of(directory));
+            persistDeploymentResources(deployment,result);
+
+            updateStatus(deployment, DeploymentStatus.STARTING);
+            strategy.activate(deployment);
+            updateStatus(deployment,DeploymentStatus.READY);
+
             return toResponse(deployment);
 
         } catch (Exception deploymentException) {
-            try {
-                deleteDeploymentResources(deployment);
-            } catch (RuntimeException cleanupException) {
+            try{
+                if(!deployment.getDeploymentResources().isEmpty()){
+                    DeploymentStrategy strategy = deploymentStrategyFactory.getStrategy(deployment.getDeploymentType());
+                    strategy.teardown(deployment);
+                }
+                removeImageIfUnreferenced(deployment);
+            }catch (RuntimeException cleanupException){
                 deploymentException.addSuppressed(cleanupException);
+
                 log.error(
                         "Cleanup failed for deployment {}",
                         deploymentId,
@@ -137,24 +153,42 @@ public class DeploymentService {
         }
     }
 
+    private void persistDeploymentResources(Deployment deployment, DeploymentResult result){
+
+        for(DeploymentResult.Result resource : result.resources()){
+            DeploymentResource deploymentResource = DeploymentResource.builder()
+                    .resourceType(resource.type())
+                    .resourceName(resource.resourceName())
+                    .externalId(resource.externalId())
+                    .serviceName(resource.serviceName())
+                    .build();
+
+            deployment.addResource(deploymentResource);
+        }
+        deployment.setCommitHash(result.commitHash());
+        deploymentRepository.save(deployment);
+    }
+
+    @Transactional
     public void deleteDeployment(User user, UUID deploymentId) {
         Deployment deployment = findDeployment(user, deploymentId);
 
         deleteDeploymentResources(deployment);
+        removeImageIfUnreferenced(deployment);
         deploymentRepository.delete(deployment);
     }
 
     private void deleteDeploymentResources(Deployment deployment) {
-        if (deployment.getDeploymentType() == DeploymentType.DOCKERFILE) {
-            dockerfileService.deleteContainer(
-                    deployment.getDeploymentId(),
-                    deployment.getContainerId()
-            );
+
+        if (!deployment.getDeploymentResources().isEmpty()) {
+            DeploymentStrategy strategy =
+                    deploymentStrategyFactory.getStrategy(
+                            deployment.getDeploymentType()
+                    );
+
+            strategy.teardown(deployment);
         }
 
-        // TODO: add docker compose deletion
-
-        removeImageIfUnreferenced(deployment);
         deleteDeploymentDirectory(deployment);
     }
 
@@ -170,10 +204,16 @@ public class DeploymentService {
         List<Deployment> deployments =
                 new ArrayList<>(project.getDeployments());
 
-        Set<String> imageNames = deployments.stream()
-                .map(Deployment::getImageName)
-                .filter(Objects::nonNull)
+        Set<String> imageNames = new HashSet<>();
+        Set<UUID> deploymentIds = deployments.stream()
+                .map(Deployment::getDeploymentId)
                 .collect(Collectors.toSet());
+        // collect all image references
+        for(Deployment deployment : deployments){
+            for(DeploymentResource deploymentResource : deployment.getImageResources()){
+                imageNames.add(deploymentResource.getResourceName());
+            }
+        }
 
         // Clean up Docker resources and files first.
         for (Deployment deployment : deployments) {
@@ -184,9 +224,12 @@ public class DeploymentService {
         project.getDeployments().clear();
         projectRepository.save(project);
 
-        // Remove images only when no deployment references them.
-        for (String imageName : imageNames) {
-            if (!deploymentRepository.existsByImageName(imageName)) {
+        for(String imageName : imageNames){
+            if (!deploymentRepository.existsImageReferenceOutside(
+                    deploymentIds,
+                    ResourceType.IMAGE,
+                    imageName
+            )) {
                 dockerService.removeImage(imageName);
             }
         }
@@ -222,34 +265,6 @@ public class DeploymentService {
         gitService.cloneRepository(repositoryUrl, filePath, 60);
     }
 
-    private void deployDockerfile(
-            Deployment deployment,
-            String directory
-    ) throws Exception {
-        updateStatus(deployment, DeploymentStatus.BUILDING);
-        DockerfileService.BuiltImage image = dockerfileService.buildImage(
-                directory,
-                deployment.getProject().getProjectId()
-        );
-
-        deployment.setCommitHash(image.commitHash());
-        deployment.setImageName(image.imageName());
-        deploymentRepository.save(deployment);
-
-        updateStatus(deployment, DeploymentStatus.STARTING);
-        String containerId = dockerfileService.createContainer(
-                deployment.getDeploymentId(),
-                deployment.getImageName()
-        );
-
-        // Persist the ID before starting so failure cleanup can find it.
-        deployment.setContainerId(containerId);
-        deploymentRepository.save(deployment);
-        dockerfileService.startContainer(containerId, deployment.getDeploymentId());
-
-        updateStatus(deployment, DeploymentStatus.READY);
-    }
-
     private DeploymentType detectDeploymentType(String directory) {
         // A Dockerfile wins when a repository has both, so Dockerfile
         // projects keep deploying even if a compose file is also present.
@@ -261,7 +276,9 @@ public class DeploymentService {
             return DeploymentType.COMPOSE;
         }
 
-        return DeploymentType.DOCKERFILE;
+        throw new DeploymentStateException(
+                "No supported deployment configuration found"
+        );
     }
 
     private String getDeploymentDirectory(Deployment deployment) {
@@ -300,14 +317,19 @@ public class DeploymentService {
     }
 
     private void removeImageIfUnreferenced(Deployment deployment) {
-        String imageName = deployment.getImageName();
+        List<DeploymentResource> images = deployment.getImageResources();
 
-        if (imageName != null
-                && !deploymentRepository.existsByImageNameAndDeploymentIdNot(
-                imageName,
-                deployment.getDeploymentId()
-        )) {
-            dockerService.removeImage(imageName);
+        for(DeploymentResource image : images){
+
+            String imageName = image.getResourceName();
+            boolean isReferenced = deploymentRepository.existsImageReference(
+                    deployment.getDeploymentId(),
+                    ResourceType.IMAGE,
+                    imageName
+            );
+            if (!isReferenced) {
+                dockerService.removeImage(imageName);
+            }
         }
     }
 
@@ -317,7 +339,9 @@ public class DeploymentService {
                 .projectId(deployment.getProject().getProjectId())
                 .status(deployment.getStatus())
                 .commitHash(deployment.getCommitHash())
-                .imageName(deployment.getImageName())
+                .imageNames(deployment.getImageResources().stream()
+                        .map(DeploymentResource::getResourceName)
+                        .toList())
                 .build();
     }
 }

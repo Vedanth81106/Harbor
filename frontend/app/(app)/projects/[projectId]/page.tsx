@@ -368,7 +368,7 @@ export default function ProjectPage() {
                       deployment.deploymentId.slice(0, 8)}
                   </p>
                   <p className="mt-1 truncate text-[12px] text-muted">
-                    {deployment.imageName ?? "Waiting to build"}
+                    {deployment.imageNames[0] ?? "Waiting to build"}
                   </p>
                 </Link>
 

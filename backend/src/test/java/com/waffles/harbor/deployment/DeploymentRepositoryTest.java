@@ -1,6 +1,9 @@
 package com.waffles.harbor.deployment;
 
 import com.waffles.harbor.auth.Role;
+import com.waffles.harbor.deployment.enums.DeploymentStatus;
+import com.waffles.harbor.deployment.enums.DeploymentType;
+import com.waffles.harbor.deployment.enums.ResourceType;
 import com.waffles.harbor.project.Project;
 import com.waffles.harbor.project.ProjectRepository;
 import com.waffles.harbor.user.User;
@@ -17,6 +20,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -64,6 +68,14 @@ class DeploymentRepositoryTest {
                 .deploymentType(DeploymentType.DOCKERFILE)
                 .status(status)
                 .build();
+    }
+
+    private void addImage(Deployment deployment, String imageName) {
+        deployment.addResource(DeploymentResource.builder()
+                .resourceType(ResourceType.IMAGE)
+                .externalId("image-id")
+                .resourceName(imageName)
+                .build());
     }
 
     @Test
@@ -123,20 +135,24 @@ class DeploymentRepositoryTest {
     }
 
     @Test
-    void shouldReturnTrueWhenImageExists() {
+    void shouldReturnTrueWhenImageReferenceExists() {
         User user = createAndSaveUser("testUser");
         Project project = createAndSaveProject(user, "project");
 
         Deployment deployment = createDeployment(project, DeploymentStatus.READY);
-        deployment.setImageName("project:1");
+        addImage(deployment, "project:1");
         deploymentRepository.save(deployment);
 
-        assertTrue(deploymentRepository.existsByImageName("project:1"));
+        assertTrue(deploymentRepository.existsImageReference(
+                UUID.randomUUID(), ResourceType.IMAGE, "project:1"
+        ));
     }
 
     @Test
     void shouldReturnFalseWhenImageDoesNotExist() {
-        assertFalse(deploymentRepository.existsByImageName("project:1"));
+        assertFalse(deploymentRepository.existsImageReference(
+                UUID.randomUUID(), ResourceType.IMAGE, "project:1"
+        ));
     }
 
     @Test
@@ -145,16 +161,15 @@ class DeploymentRepositoryTest {
         Project project = createAndSaveProject(user, "project");
 
         Deployment first = createDeployment(project, DeploymentStatus.READY);
-        first.setImageName("project:1");
+        addImage(first, "project:1");
         deploymentRepository.save(first);
 
         Deployment second = createDeployment(project, DeploymentStatus.READY);
-        second.setImageName("project:1");
+        addImage(second, "project:1");
         deploymentRepository.save(second);
 
-        assertTrue(deploymentRepository.existsByImageNameAndDeploymentIdNot(
-                "project:1",
-                first.getDeploymentId()
+        assertTrue(deploymentRepository.existsImageReference(
+                first.getDeploymentId(), ResourceType.IMAGE, "project:1"
         ));
     }
 
@@ -164,12 +179,34 @@ class DeploymentRepositoryTest {
         Project project = createAndSaveProject(user, "project");
 
         Deployment deployment = createDeployment(project, DeploymentStatus.READY);
-        deployment.setImageName("project:1");
+        addImage(deployment, "project:1");
         deploymentRepository.save(deployment);
 
-        assertFalse(deploymentRepository.existsByImageNameAndDeploymentIdNot(
-                "project:1",
-                deployment.getDeploymentId()
+        assertFalse(deploymentRepository.existsImageReference(
+                deployment.getDeploymentId(), ResourceType.IMAGE, "project:1"
+        ));
+    }
+
+    @Test
+    void shouldDetectImageOutsideGivenDeployments() {
+        User user = createAndSaveUser("testUser");
+        Project project = createAndSaveProject(user, "project");
+
+        Deployment inside = createDeployment(project, DeploymentStatus.READY);
+        addImage(inside, "project:1");
+        deploymentRepository.save(inside);
+
+        Deployment outside = createDeployment(project, DeploymentStatus.READY);
+        addImage(outside, "project:1");
+        deploymentRepository.save(outside);
+
+        assertTrue(deploymentRepository.existsImageReferenceOutside(
+                Set.of(inside.getDeploymentId()), ResourceType.IMAGE, "project:1"
+        ));
+        assertFalse(deploymentRepository.existsImageReferenceOutside(
+                Set.of(inside.getDeploymentId(), outside.getDeploymentId()),
+                ResourceType.IMAGE,
+                "project:1"
         ));
     }
 

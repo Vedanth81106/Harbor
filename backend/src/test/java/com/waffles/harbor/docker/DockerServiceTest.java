@@ -54,6 +54,7 @@ class DockerServiceTest {
     private static final UUID DEPLOYMENT_ID =
             UUID.fromString("12345678-1234-1234-1234-123456789012");
     private static final String NETWORK_NAME = "net-12345678";
+    private static final String NETWORK_ID = "network-id";
 
     @Mock
     private DockerClient dockerClient;
@@ -64,6 +65,15 @@ class DockerServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(dockerService, "domainName", "example.com");
+    }
+
+    private void stubNetworkInspection() {
+        InspectNetworkCmd inspectNetwork = mock(InspectNetworkCmd.class);
+        Network network = mock(Network.class);
+        when(dockerClient.inspectNetworkCmd()).thenReturn(inspectNetwork);
+        when(inspectNetwork.withNetworkId(NETWORK_ID)).thenReturn(inspectNetwork);
+        when(inspectNetwork.exec()).thenReturn(network);
+        when(network.getName()).thenReturn(NETWORK_NAME);
     }
 
     // ---------- buildImage ----------
@@ -84,8 +94,9 @@ class DockerServiceTest {
                     when(callback.awaitImageId()).thenReturn("image-id");
                 })) {
 
-            dockerService.buildImage(directory.toString(), "project:latest");
+            String imageId = dockerService.buildImage(directory.toString(), "project:latest");
 
+            assertEquals("image-id", imageId);
             assertEquals(1, construction.constructed().size());
             verify(construction.constructed().get(0)).awaitImageId();
         }
@@ -99,10 +110,12 @@ class DockerServiceTest {
 
     @Test
     void shouldCreateContainerOnIsolatedNetworkWithTraefikLabels() {
-        CreateNetworkCmd createNetworkCmd = mock(CreateNetworkCmd.class);
-        when(dockerClient.createNetworkCmd()).thenReturn(createNetworkCmd);
-        when(createNetworkCmd.withName(NETWORK_NAME)).thenReturn(createNetworkCmd);
-        when(createNetworkCmd.withDriver("bridge")).thenReturn(createNetworkCmd);
+        InspectNetworkCmd inspectNetwork = mock(InspectNetworkCmd.class);
+        Network network = mock(Network.class);
+        when(dockerClient.inspectNetworkCmd()).thenReturn(inspectNetwork);
+        when(inspectNetwork.withNetworkId(NETWORK_ID)).thenReturn(inspectNetwork);
+        when(inspectNetwork.exec()).thenReturn(network);
+        when(network.getName()).thenReturn(NETWORK_NAME);
 
         CreateContainerCmd createContainerCmd = mock(CreateContainerCmd.class);
         when(dockerClient.createContainerCmd("project:latest")).thenReturn(createContainerCmd);
@@ -115,14 +128,14 @@ class DockerServiceTest {
         when(createContainerCmd.exec()).thenReturn(response);
 
         String containerId = dockerService.createContainer(
-                DEPLOYMENT_ID,
                 "project:latest",
                 8080,
-                "harbor-12345678"
+                "harbor-12345678",
+                NETWORK_ID
         );
 
         assertEquals("container-id", containerId);
-        verify(createNetworkCmd).exec();
+        verify(dockerClient, never()).createNetworkCmd();
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, String>> labelsCaptor = ArgumentCaptor.forClass(Map.class);
@@ -157,11 +170,13 @@ class DockerServiceTest {
     }
 
     @Test
-    void shouldRemoveNetworkWhenContainerCreationFails() {
-        CreateNetworkCmd createNetworkCmd = mock(CreateNetworkCmd.class);
-        when(dockerClient.createNetworkCmd()).thenReturn(createNetworkCmd);
-        when(createNetworkCmd.withName(NETWORK_NAME)).thenReturn(createNetworkCmd);
-        when(createNetworkCmd.withDriver("bridge")).thenReturn(createNetworkCmd);
+    void shouldPropagateContainerCreationFailure() {
+        InspectNetworkCmd inspectNetwork = mock(InspectNetworkCmd.class);
+        Network network = mock(Network.class);
+        when(dockerClient.inspectNetworkCmd()).thenReturn(inspectNetwork);
+        when(inspectNetwork.withNetworkId(NETWORK_ID)).thenReturn(inspectNetwork);
+        when(inspectNetwork.exec()).thenReturn(network);
+        when(network.getName()).thenReturn(NETWORK_NAME);
 
         CreateContainerCmd createContainerCmd = mock(CreateContainerCmd.class);
         when(dockerClient.createContainerCmd("project:latest")).thenReturn(createContainerCmd);
@@ -170,20 +185,15 @@ class DockerServiceTest {
         when(createContainerCmd.withHostConfig(any(HostConfig.class))).thenReturn(createContainerCmd);
         when(createContainerCmd.exec()).thenThrow(new RuntimeException("docker failure"));
 
-        RemoveNetworkCmd removeNetworkCmd = mock(RemoveNetworkCmd.class);
-        when(dockerClient.removeNetworkCmd(NETWORK_NAME)).thenReturn(removeNetworkCmd);
-
         assertThrows(
                 RuntimeException.class,
                 () -> dockerService.createContainer(
-                        DEPLOYMENT_ID,
                         "project:latest",
                         8080,
-                        "harbor-12345678"
+                        "harbor-12345678",
+                        NETWORK_ID
                 )
         );
-
-        verify(removeNetworkCmd).exec();
     }
 
     // ---------- startContainer ----------
@@ -199,19 +209,19 @@ class DockerServiceTest {
         InspectNetworkCmd inspectNetwork = mock(InspectNetworkCmd.class);
         Network network = mock(Network.class);
         when(dockerClient.inspectNetworkCmd()).thenReturn(inspectNetwork);
-        when(inspectNetwork.withNetworkId(NETWORK_NAME)).thenReturn(inspectNetwork);
+        when(inspectNetwork.withNetworkId(NETWORK_ID)).thenReturn(inspectNetwork);
         when(inspectNetwork.exec()).thenReturn(network);
         when(network.getContainers()).thenReturn(Map.of());
 
         ConnectToNetworkCmd connect = mock(ConnectToNetworkCmd.class);
         when(dockerClient.connectToNetworkCmd()).thenReturn(connect);
-        when(connect.withNetworkId(NETWORK_NAME)).thenReturn(connect);
+        when(connect.withNetworkId(NETWORK_ID)).thenReturn(connect);
         when(connect.withContainerId("traefik-id")).thenReturn(connect);
 
         StartContainerCmd start = mock(StartContainerCmd.class);
         when(dockerClient.startContainerCmd("container-id")).thenReturn(start);
 
-        dockerService.startContainer("container-id", DEPLOYMENT_ID);
+        dockerService.startContainer("container-id", NETWORK_ID);
 
         verify(connect).exec();
         verify(start).exec();
@@ -228,7 +238,7 @@ class DockerServiceTest {
         InspectNetworkCmd inspectNetwork = mock(InspectNetworkCmd.class);
         Network network = mock(Network.class);
         when(dockerClient.inspectNetworkCmd()).thenReturn(inspectNetwork);
-        when(inspectNetwork.withNetworkId(NETWORK_NAME)).thenReturn(inspectNetwork);
+        when(inspectNetwork.withNetworkId(NETWORK_ID)).thenReturn(inspectNetwork);
         when(inspectNetwork.exec()).thenReturn(network);
         when(network.getContainers()).thenReturn(
                 Map.of("traefik-id", mock(Network.ContainerNetworkConfig.class))
@@ -237,7 +247,7 @@ class DockerServiceTest {
         StartContainerCmd start = mock(StartContainerCmd.class);
         when(dockerClient.startContainerCmd("container-id")).thenReturn(start);
 
-        dockerService.startContainer("container-id", DEPLOYMENT_ID);
+        dockerService.startContainer("container-id", NETWORK_ID);
 
         verify(dockerClient, never()).connectToNetworkCmd();
         verify(start).exec();
@@ -361,6 +371,7 @@ class DockerServiceTest {
 
     @Test
     void shouldTearDownDisconnectContainerAndNetwork() {
+        stubNetworkInspection();
         InspectContainerCmd inspectTraefik = mock(InspectContainerCmd.class);
         InspectContainerResponse traefikInfo = mock(InspectContainerResponse.class);
         when(dockerClient.inspectContainerCmd("traefik")).thenReturn(inspectTraefik);
@@ -370,7 +381,7 @@ class DockerServiceTest {
         DisconnectFromNetworkCmd disconnect = mock(DisconnectFromNetworkCmd.class);
         when(dockerClient.disconnectFromNetworkCmd()).thenReturn(disconnect);
         when(disconnect.withContainerId("traefik-id")).thenReturn(disconnect);
-        when(disconnect.withNetworkId(NETWORK_NAME)).thenReturn(disconnect);
+        when(disconnect.withNetworkId(NETWORK_ID)).thenReturn(disconnect);
 
         RemoveContainerCmd remove = mock(RemoveContainerCmd.class);
         when(dockerClient.removeContainerCmd("container-id")).thenReturn(remove);
@@ -379,7 +390,7 @@ class DockerServiceTest {
         RemoveNetworkCmd removeNetwork = mock(RemoveNetworkCmd.class);
         when(dockerClient.removeNetworkCmd(NETWORK_NAME)).thenReturn(removeNetwork);
 
-        dockerService.tearDownDeployment("container-id", DEPLOYMENT_ID);
+        dockerService.tearDownDeployment("container-id", NETWORK_ID);
 
         verify(disconnect).exec();
         verify(remove).exec();
@@ -388,6 +399,7 @@ class DockerServiceTest {
 
     @Test
     void shouldTearDownNetworkWhenContainerIdWasNeverSaved() {
+        stubNetworkInspection();
         InspectContainerCmd inspectTraefik = mock(InspectContainerCmd.class);
         InspectContainerResponse traefikInfo = mock(InspectContainerResponse.class);
         when(dockerClient.inspectContainerCmd("traefik")).thenReturn(inspectTraefik);
@@ -397,12 +409,12 @@ class DockerServiceTest {
         DisconnectFromNetworkCmd disconnect = mock(DisconnectFromNetworkCmd.class);
         when(dockerClient.disconnectFromNetworkCmd()).thenReturn(disconnect);
         when(disconnect.withContainerId("traefik-id")).thenReturn(disconnect);
-        when(disconnect.withNetworkId(NETWORK_NAME)).thenReturn(disconnect);
+        when(disconnect.withNetworkId(NETWORK_ID)).thenReturn(disconnect);
 
         RemoveNetworkCmd removeNetwork = mock(RemoveNetworkCmd.class);
         when(dockerClient.removeNetworkCmd(NETWORK_NAME)).thenReturn(removeNetwork);
 
-        dockerService.tearDownDeployment(null, DEPLOYMENT_ID);
+        dockerService.tearDownDeployment(null, NETWORK_ID);
 
         verify(dockerClient, never()).removeContainerCmd(any());
         verify(removeNetwork).exec();
@@ -410,6 +422,7 @@ class DockerServiceTest {
 
     @Test
     void shouldStillTearDownWhenTraefikIsMissing() {
+        stubNetworkInspection();
         InspectContainerCmd inspectTraefik = mock(InspectContainerCmd.class);
         when(dockerClient.inspectContainerCmd("traefik")).thenReturn(inspectTraefik);
         when(inspectTraefik.exec()).thenThrow(new NotFoundException("absent"));
@@ -421,11 +434,24 @@ class DockerServiceTest {
         RemoveNetworkCmd removeNetwork = mock(RemoveNetworkCmd.class);
         when(dockerClient.removeNetworkCmd(NETWORK_NAME)).thenReturn(removeNetwork);
 
-        dockerService.tearDownDeployment("container-id", DEPLOYMENT_ID);
+        dockerService.tearDownDeployment("container-id", NETWORK_ID);
 
         verify(dockerClient, never()).disconnectFromNetworkCmd();
         verify(remove).exec();
         verify(removeNetwork).exec();
+    }
+
+    @Test
+    void shouldTearDownWithoutNetworkId() {
+        RemoveContainerCmd remove = mock(RemoveContainerCmd.class);
+        when(dockerClient.removeContainerCmd("container-id")).thenReturn(remove);
+        when(remove.withForce(true)).thenReturn(remove);
+
+        assertDoesNotThrow(() -> dockerService.tearDownDeployment("container-id", null));
+
+        verify(remove).exec();
+        verify(dockerClient, never()).inspectContainerCmd("traefik");
+        verify(dockerClient, never()).inspectNetworkCmd();
     }
 
     // ---------- reconnectTraefik / recoverContainer ----------
@@ -443,7 +469,7 @@ class DockerServiceTest {
         InspectNetworkCmd inspectNetwork = mock(InspectNetworkCmd.class);
         Network network = mock(Network.class);
         when(dockerClient.inspectNetworkCmd()).thenReturn(inspectNetwork);
-        when(inspectNetwork.withNetworkId(NETWORK_NAME)).thenReturn(inspectNetwork);
+        when(inspectNetwork.withNetworkId(NETWORK_ID)).thenReturn(inspectNetwork);
         when(inspectNetwork.exec()).thenReturn(network);
         when(network.getContainers()).thenReturn(Map.of());
 
@@ -455,10 +481,10 @@ class DockerServiceTest {
 
         ConnectToNetworkCmd connect = mock(ConnectToNetworkCmd.class);
         when(dockerClient.connectToNetworkCmd()).thenReturn(connect);
-        when(connect.withNetworkId(NETWORK_NAME)).thenReturn(connect);
+        when(connect.withNetworkId(NETWORK_ID)).thenReturn(connect);
         when(connect.withContainerId("traefik-id")).thenReturn(connect);
 
-        dockerService.reconnectTraefik(DEPLOYMENT_ID, "container-id");
+        dockerService.reconnectTraefik(NETWORK_ID, "container-id");
 
         verify(connect).exec();
     }
@@ -473,7 +499,7 @@ class DockerServiceTest {
         when(appInfo.getState()).thenReturn(appState);
         when(appState.getRunning()).thenReturn(false);
 
-        dockerService.reconnectTraefik(DEPLOYMENT_ID, "container-id");
+        dockerService.reconnectTraefik(NETWORK_ID, "container-id");
 
         verify(dockerClient, never()).inspectNetworkCmd();
         verify(dockerClient, never()).connectToNetworkCmd();
@@ -486,7 +512,7 @@ class DockerServiceTest {
         when(inspectApp.exec()).thenThrow(new NotFoundException("absent"));
 
         assertDoesNotThrow(
-                () -> dockerService.reconnectTraefik(DEPLOYMENT_ID, "container-id")
+                () -> dockerService.reconnectTraefik(NETWORK_ID, "container-id")
         );
     }
 
@@ -509,19 +535,19 @@ class DockerServiceTest {
         InspectNetworkCmd inspectNetwork = mock(InspectNetworkCmd.class);
         Network network = mock(Network.class);
         when(dockerClient.inspectNetworkCmd()).thenReturn(inspectNetwork);
-        when(inspectNetwork.withNetworkId(NETWORK_NAME)).thenReturn(inspectNetwork);
+        when(inspectNetwork.withNetworkId(NETWORK_ID)).thenReturn(inspectNetwork);
         when(inspectNetwork.exec()).thenReturn(network);
         when(network.getContainers()).thenReturn(Map.of());
 
         ConnectToNetworkCmd connect = mock(ConnectToNetworkCmd.class);
         when(dockerClient.connectToNetworkCmd()).thenReturn(connect);
-        when(connect.withNetworkId(NETWORK_NAME)).thenReturn(connect);
+        when(connect.withNetworkId(NETWORK_ID)).thenReturn(connect);
         when(connect.withContainerId("traefik-id")).thenReturn(connect);
 
         StartContainerCmd start = mock(StartContainerCmd.class);
         when(dockerClient.startContainerCmd("container-id")).thenReturn(start);
 
-        dockerService.recoverContainer(DEPLOYMENT_ID, "container-id");
+        dockerService.recoverContainer("container-id", NETWORK_ID);
 
         verify(start).exec();
     }
@@ -533,7 +559,7 @@ class DockerServiceTest {
         when(inspectApp.exec()).thenThrow(new NotFoundException("absent"));
 
         assertDoesNotThrow(
-                () -> dockerService.recoverContainer(DEPLOYMENT_ID, "container-id")
+                () -> dockerService.recoverContainer("container-id", NETWORK_ID)
         );
     }
 }

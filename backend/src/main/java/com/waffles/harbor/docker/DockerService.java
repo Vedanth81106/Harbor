@@ -2,15 +2,9 @@
 package com.waffles.harbor.docker;
 
 import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.command.BuildImageResultCallback;
-import com.github.dockerjava.api.command.CreateContainerResponse;
-import com.github.dockerjava.api.command.InspectContainerResponse;
-import com.github.dockerjava.api.command.InspectImageResponse;
+import com.github.dockerjava.api.command.*;
 import com.github.dockerjava.api.exception.NotFoundException;
-import com.github.dockerjava.api.model.ExposedPort;
-import com.github.dockerjava.api.model.HostConfig;
-import com.github.dockerjava.api.model.LogConfig;
-import com.github.dockerjava.api.model.RestartPolicy;
+import com.github.dockerjava.api.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,10 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -42,7 +33,8 @@ public class DockerService {
     private static final long PID_LIMIT = 100L;
 
     private final DockerClient dockerClient;
-    public void buildImage(String filePath, String imageTag) throws
+
+    public String buildImage(String filePath, String imageTag) throws
             InterruptedException, TimeoutException, IOException {
         File buildDirectory = new File(filePath);
         File dockerfile = new File(buildDirectory, "Dockerfile");
@@ -57,55 +49,50 @@ public class DockerService {
             boolean completed = callback.awaitCompletion(10, TimeUnit.MINUTES);
             if(!completed) throw new TimeoutException("Docker image build exceeded 10 minutes and timed out");
 
-            callback.awaitImageId();
+            return callback.awaitImageId();
         }
     }
 
     public String createContainer(
-            UUID deploymentId,
             String imageTag,
             int containerPort,
-            String containerName
+            String containerName,
+            String networkId
     ) {
-        String networkName = getNetworkName(deploymentId);
+        Network network = dockerClient.inspectNetworkCmd()
+                        .withNetworkId(networkId).exec();
+        String networkName = network.getName();
 
-        createIsolatedNetwork(networkName);
+        HostConfig hostConfig = HostConfig.newHostConfig()
+                .withNetworkMode(networkName)
+                .withPidsLimit(PID_LIMIT)
+                .withMemory(MEMORY_LIMIT)
+                .withCpuPeriod(CPU_PERIOD)
+                .withCpuQuota(CPU_QUOTA)
+                .withLogConfig(new LogConfig(
+                        LogConfig.LoggingType.JSON_FILE,
+                        Map.of("max-size", "10m", "max-file", "3")))
+                .withRestartPolicy(RestartPolicy.unlessStoppedRestart());
 
-        try {
-            HostConfig hostConfig = HostConfig.newHostConfig()
-                    .withNetworkMode(networkName)
-                    .withPidsLimit(PID_LIMIT)
-                    .withMemory(MEMORY_LIMIT)
-                    .withCpuPeriod(CPU_PERIOD)
-                    .withCpuQuota(CPU_QUOTA)
-                    .withLogConfig(new LogConfig(
-                            LogConfig.LoggingType.JSON_FILE,
-                            Map.of("max-size", "10m", "max-file", "3")))
-                    .withRestartPolicy(RestartPolicy.unlessStoppedRestart());
+        Map<String, String> labels = createTraefikLabels(
+                networkName,
+                containerPort,
+                containerName
+        );
 
-            Map<String, String> labels = createTraefikLabels(
-                    networkName,
-                    containerPort,
-                    containerName
-            );
+        CreateContainerResponse response = dockerClient
+                .createContainerCmd(imageTag)
+                .withLabels(labels)
+                .withName(containerName)
+                .withHostConfig(hostConfig)
+                .exec();
 
-            CreateContainerResponse response = dockerClient
-                    .createContainerCmd(imageTag)
-                    .withLabels(labels)
-                    .withName(containerName)
-                    .withHostConfig(hostConfig)
-                    .exec();
-
-            return response.getId();
-
-        } catch (RuntimeException e) {
-            removeNetworkIfPresent(networkName);
-            throw e;
-        }
+        return response.getId();
     }
 
-    public void startContainer(String containerId, UUID deploymentId) {
-        String networkName = getNetworkName(deploymentId);
+    public void startContainer(
+            String containerId,
+            String networkId) {
 
         String traefikId = dockerClient
                 .inspectContainerCmd(TRAEFIK_CONTAINER)
@@ -113,14 +100,14 @@ public class DockerService {
                 .getId();
 
         boolean isAlreadyConnected = dockerClient.inspectNetworkCmd()
-                .withNetworkId(networkName)
+                .withNetworkId(networkId)
                 .exec()
                 .getContainers()
                 .containsKey(traefikId);
 
         if (!isAlreadyConnected) {
             dockerClient.connectToNetworkCmd()
-                    .withNetworkId(networkName)
+                    .withNetworkId(networkId)
                     .withContainerId(traefikId)
                     .exec();
         }
@@ -150,14 +137,17 @@ public class DockerService {
         }
     }
 
-    public void recoverContainer(UUID deploymentId, String containerId){
+    public void recoverContainer(
+            String containerId,
+            String networkId
+    ){
         try{
             InspectContainerResponse info = dockerClient
                     .inspectContainerCmd(containerId)
                     .exec();
             if(!Boolean.TRUE.equals(info.getState().getRunning())) {
-                startContainer(containerId, deploymentId);
-            } else reconnectTraefik(deploymentId, containerId);
+                startContainer(containerId, networkId);
+            } else reconnectTraefik(networkId, containerId);
         }catch (com.github.dockerjava.api.exception.NotFoundException e) {
             log.debug("Container with container id: " + containerId + "does not exist!");
         }
@@ -195,44 +185,61 @@ public class DockerService {
      * Removes a deployment's container, Traefik network attachment,
      * and dedicated network. Safe to call after partial provisioning.
      */
-    public void tearDownDeployment(String containerId, UUID deploymentId) {
-        String networkName = getNetworkName(deploymentId);
 
-        try {
-            String traefikId = dockerClient
-                    .inspectContainerCmd(TRAEFIK_CONTAINER)
-                    .exec()
-                    .getId();
+    public void tearDownDeployment(String containerId,
+                                   String networkId) {
+        List<RuntimeException> failures = new ArrayList<>();
 
-            dockerClient.disconnectFromNetworkCmd()
-                    .withContainerId(traefikId)
-                    .withNetworkId(networkName)
-                    .exec();
+        if (networkId != null) {
+            try {
+                String traefikId = dockerClient
+                        .inspectContainerCmd(TRAEFIK_CONTAINER)
+                        .exec()
+                        .getId();
 
-        } catch (NotFoundException e) {
-            log.debug(
-                    "Traefik or network attachment {} is already absent.",
-                    networkName
-            );
+                dockerClient.disconnectFromNetworkCmd()
+                        .withContainerId(traefikId)
+                        .withNetworkId(networkId)
+                        .exec();
+
+            } catch (NotFoundException nfe) {
+                log.debug("Traefik or network attachment {} is already absent.", networkId);
+            } catch (RuntimeException e) {
+                failures.add(e);
+            }
         }
-
+        // Remove container
         if (containerId != null) {
             try {
                 dockerClient.removeContainerCmd(containerId)
                         .withForce(true)
                         .exec();
-
             } catch (NotFoundException e) {
                 log.debug("Container {} is already absent.", containerId);
+            } catch (RuntimeException e) {
+                failures.add(e);
             }
         }
 
-        removeNetworkIfPresent(networkName);
+        if (networkId != null) {
+            try {
+                removeNetworkIfPresent(networkId);
+            } catch (RuntimeException e) {
+                failures.add(e);
+            }
+        }
+
+        if (!failures.isEmpty()) {
+            RuntimeException exception =
+                    new RuntimeException("Deployment cleanup was incomplete");
+
+            failures.forEach(exception::addSuppressed);
+            throw exception;
+        }
     }
 
     // this method is used for reconnecting traefik to existing deployment containers after a docker restart
-    public void reconnectTraefik(UUID deploymentId, String containerId){
-        String networkName = getNetworkName(deploymentId);
+    public void reconnectTraefik(String networkName, String containerId){
 
         try{
             InspectContainerResponse app = dockerClient
@@ -265,25 +272,42 @@ public class DockerService {
             }
         }catch(NotFoundException e){
             log.warn(
-                    "Cannot restore routing for deployment {}: " +
-                            "container or network not found",
-                    deploymentId
+                    "Cannot restore routing: container {} or network {} not found",
+                    containerId,
+                    networkName
             );
         }
     }
 
-    private void createIsolatedNetwork(String networkName) {
-        dockerClient.createNetworkCmd()
-                .withName(networkName)
-                .withDriver("bridge")
-                .exec();
+    public String createNetwork(UUID deploymentId){
+        String networkName = getNetworkName(deploymentId);
+        try {
+            CreateNetworkResponse response = dockerClient.createNetworkCmd()
+                    .withName(networkName)
+                    .withDriver("bridge")
+                    .exec();
+
+            return response.getId();
+        } catch (Exception e) {
+            removeNetworkIfPresent(networkName);
+            throw new RuntimeException(e);
+        }
     }
 
-    private void removeNetworkIfPresent(String networkName) {
+    public String getDeploymentNetworkName(UUID deploymentId) {
+        return getNetworkName(deploymentId);
+    }
+
+    private void removeNetworkIfPresent(String networkId) {
         try {
+            Network network = dockerClient.inspectNetworkCmd()
+                    .withNetworkId(networkId)
+                    .exec();
+
+            String networkName = network.getName();
             dockerClient.removeNetworkCmd(networkName).exec();
         } catch (NotFoundException e) {
-            log.debug("Network {} is already absent.", networkName);
+            log.debug("Network {} is already absent.", networkId);
         }
     }
 
